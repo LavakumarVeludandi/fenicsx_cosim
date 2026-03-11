@@ -5,21 +5,43 @@ Inspired by the Kratos CoSimIO architecture, this package provides a
 non-intrusive API for connecting independent FEniCSx solvers across
 different processes for partitioned co-simulation.
 
-Example
--------
+Core modules
+------------
+- **CouplingInterface** — The main user API for boundary coupling, AMR,
+  and FE² scatter-gather workflows.
+- **MeshExtractor** — Extracts boundary DoFs and coordinates from FEniCSx.
+- **Communicator** — ZeroMQ-based 1-to-1 inter-process communication.
+- **DataMapper / NearestNeighborMapper** — Non-conforming mesh interpolation.
+- **DynamicMapper** — AMR-aware mapping with automatic re-negotiation.
+- **QuadratureExtractor** — Integration-point data for FE² homogenization.
+- **ScatterGatherCommunicator** — PUSH/PULL fan-out for parallel RVE dispatch.
+
+Example (Standard Boundary Coupling)
+-------------------------------------
 >>> from fenicsx_cosim import CouplingInterface
 >>> cosim = CouplingInterface(name="ThermalSolver", partner_name="MechanicalSolver")
 >>> cosim.register_interface(mesh, facet_tags, marker_id=1)
 >>> cosim.export_data("TemperatureField", temperature_function)
 >>> cosim.import_data("DisplacementField", displacement_function)
+
+Example (FE² Scatter-Gather)
+-----------------------------
+>>> cosim_fe2 = CouplingInterface(name="Macro", role="Master",
+...     topology="scatter-gather")
+>>> cosim_fe2.register_quadrature_space(V_quad)
+>>> cosim_fe2.scatter_data("StrainTensor", macro_strains)
+>>> stresses = cosim_fe2.gather_data("StressTensor")
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from fenicsx_cosim.coupling_interface import CouplingInterface
 from fenicsx_cosim.mesh_extractor import MeshExtractor
 from fenicsx_cosim.communicator import Communicator
 from fenicsx_cosim.data_mapper import DataMapper, NearestNeighborMapper
+from fenicsx_cosim.dynamic_mapper import DynamicMapper
+from fenicsx_cosim.quadrature_extractor import QuadratureExtractor
+from fenicsx_cosim.scatter_gather_communicator import ScatterGatherCommunicator
 
 __all__ = [
     "CouplingInterface",
@@ -27,4 +49,7 @@ __all__ = [
     "Communicator",
     "DataMapper",
     "NearestNeighborMapper",
+    "DynamicMapper",
+    "QuadratureExtractor",
+    "ScatterGatherCommunicator",
 ]
