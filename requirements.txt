@@ -1,0 +1,7 @@
+# Core dependencies for fenicsx-cosim
+# NOTE: fenics-dolfinx is typically installed via conda, not pip.
+# Install with: conda install -c conda-forge fenics-dolfinx>=0.10.0
+mpi4py
+numpy>=1.24.0
+pyzmq>=25.0.0
+scipy>=1.10.0
