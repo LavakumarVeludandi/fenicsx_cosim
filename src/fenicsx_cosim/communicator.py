@@ -172,14 +172,14 @@ class Communicator:
     # Data exchange
     # ------------------------------------------------------------------
 
-    def send_array(self, data_name: str, array: np.ndarray) -> None:
+    def send_array(self, data_name: str, array: np.ndarray | "sps.csr_matrix") -> None:
         """Serialize and send a named NumPy array to the partner.
 
         Parameters
         ----------
         data_name : str
             Identifier for the data (e.g. ``"TemperatureField"``).
-        array : np.ndarray
+        array : np.ndarray or scipy.sparse.spmatrix
             The data to transmit.
 
         Raises
@@ -195,12 +195,12 @@ class Communicator:
             self.name, data_name, array.shape, array.dtype,
         )
 
-    def receive_array(self) -> tuple[str, np.ndarray]:
+    def receive_array(self) -> tuple[str, np.ndarray | "sps.csr_matrix"]:
         """Receive a named NumPy array from the partner.
 
         Returns
         -------
-        tuple[str, np.ndarray]
+        tuple[str, np.ndarray | sps.csr_matrix]
             ``(data_name, array)``
 
         Raises

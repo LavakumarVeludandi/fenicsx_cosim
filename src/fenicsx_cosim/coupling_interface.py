@@ -644,6 +644,55 @@ class CouplingInterface:
             self.name, received_name, len(mapped_values),
         )
 
+    def export_raw(self, data_name: str, array: np.ndarray | "sps.csr_matrix") -> None:
+        """Send a raw NumPy array or SciPy sparse matrix to the partner solver.
+
+        This is useful for sending non-field data like sparse stiffness matrices
+        or scalar values (e.g. for Shakedown analysis or custom optimization loops).
+
+        Parameters
+        ----------
+        data_name : str
+            Identifier for the data.
+        array : np.ndarray or scipy.sparse.spmatrix
+            The raw data to transmit.
+        """
+        self._communicator.send_array(data_name, array)
+        if hasattr(array, "shape"):
+            size = array.shape
+        else:
+            size = len(array)
+        logger.debug("[%s] Exported raw data '%s' — shape %s", self.name, data_name, size)
+
+    def import_raw(self, data_name: str) -> np.ndarray | "sps.csr_matrix":
+        """Receive a raw NumPy array or SciPy sparse matrix from the partner solver.
+
+        Parameters
+        ----------
+        data_name : str
+            Expected identifier for the incoming data.
+
+        Returns
+        -------
+        np.ndarray or scipy.sparse.spmatrix
+            The raw data received.
+        """
+        received_name, received_values = self._communicator.receive_array()
+
+        if received_name != data_name:
+            logger.warning(
+                "[%s] Expected raw data '%s' but received '%s'",
+                self.name, data_name, received_name,
+            )
+
+        if hasattr(received_values, "shape"):
+            size = received_values.shape
+        else:
+            size = len(received_values)
+        logger.debug("[%s] Imported raw data '%s' — shape %s", self.name, received_name, size)
+        
+        return received_values
+
     # ==================================================================
     # Synchronization
     # ==================================================================
