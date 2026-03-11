@@ -128,6 +128,21 @@ export PYTHONPATH=src
 python examples/fe2_micro_worker.py
 ```
 
+### 3. Shakedown Verification Loop
+Demonstrates extracting whole sparse stiffness matrices from FEniCSx and beaming them to a mock Gurobi/Mosek optimizer on another process to compute a kinematic safety factor.
+
+Terminal 1 (FEniCSx Master):
+```bash
+export PYTHONPATH=src
+python examples/shakedown_fenicsx_master.py
+```
+
+Terminal 2 (Optimizer Worker):
+```bash
+export PYTHONPATH=src
+python examples/shakedown_optimizer_worker.py
+```
+
 ## Running Tests
 
 Make sure the `src` directory is in your `PYTHONPATH` before running the tests. All tests require `fenics-dolfinx` to be installed in your environment.
@@ -145,7 +160,7 @@ pytest tests/ -v
 | Phase 2 — IPC Layer | ✅ | `Communicator` with PyZMQ |
 | Phase 3 — Integration & API | ✅ | `CouplingInterface` combining all components |
 | Phase 4 — Mapping | ✅ | `NearestNeighborMapper` with KDTree |
-| Phase 5 — Advanced Features | ✅ | `AMR` negotiation and `FE²` parallel dispatch |
+| Phase 5 — Advanced Features | ✅ | `AMR` negotiation, `FE²` dispatch, and Sparse `Shakedown` transfer |
 
 ## License
 
