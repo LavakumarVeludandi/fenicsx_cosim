@@ -383,6 +383,43 @@ class CouplingInterface:
             self.name, len(self._extractor.boundary_dof_indices),
         )
 
+    def check_mesh_update(self) -> bool:
+        """Lightweight check to see if the partner solver updated its mesh.
+
+        If the partner calls ``update_interface_geometry()``, *this* solver
+        must call ``check_mesh_update()`` at the same point in the time
+        loop to receive the new coordinates and re-build the mapping.
+
+        If *neither* solver refined its mesh but AMR is active, both solvers
+        should call ``check_mesh_update()`` to acknowledge no changes.
+
+        Returns
+        -------
+        bool
+            ``True`` if the partner updated its mesh and the mapping was
+            rebuilt; ``False`` otherwise.
+        """
+        self._check_registered()
+        if self._dynamic_mapper is None:
+            return False
+
+        partner_coords = self._dynamic_mapper.negotiate_update(
+            communicator=self._communicator,
+            role=self.role,
+            my_new_coords=None,
+        )
+
+        if partner_coords is not None:
+            self._partner_coords = partner_coords
+            self._mapper = NearestNeighborMapper()
+            self._mapper.build(
+                source_coords=partner_coords,
+                target_coords=self._extractor.boundary_coordinates,
+            )
+            logger.info("[%s] Responded to partner's mesh update.", self.name)
+            return True
+        return False
+
     # ==================================================================
     # FE²: Quadrature space registration
     # ==================================================================

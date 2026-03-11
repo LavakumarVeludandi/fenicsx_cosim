@@ -36,11 +36,11 @@ comm = MPI.COMM_WORLD
 mesh = dolfinx.mesh.create_unit_square(comm, 2, 2)
 
 # Macroscopic displacement field
-V_macro = dolfinx.fem.functionspace(mesh, ("Lagrange", 1))
+V_macro = dolfinx.fem.functionspace(mesh, ("Lagrange", 1, (mesh.geometry.dim,)))
 u_macro = dolfinx.fem.Function(V_macro, name="MacroDisplacement")
 
 # Create a dummy displacement (e.g., simple tension)
-u_macro.interpolate(lambda x: (0.1 * x[0], -0.02 * x[1]))
+u_macro.interpolate(lambda x: np.vstack((0.1 * x[0], -0.02 * x[1])))
 
 # ========================================================================
 # 2. Quadrature Space for Integration Points

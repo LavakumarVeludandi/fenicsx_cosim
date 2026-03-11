@@ -91,14 +91,49 @@ while t < T:
 | `MeshExtractor` | Extracts boundary DoFs and coordinates from FEniCSx meshes |
 | `Communicator` | ZeroMQ `PAIR` sockets for bidirectional data exchange |
 | `DataMapper` | `scipy.spatial.KDTree` nearest-neighbor mapping for non-conforming meshes |
+| `DynamicMapper` | Handles AMR mesh-remapping via ZeroMQ mesh-update negotiation |
+| `QuadratureExtractor` | FE² integration point data extraction (via basix & ufl) |
+| `ScatterGatherCommunicator`| ZeroMQ `PUSH/PULL` sockets for parallel RVE dispatch |
+
+## Advanced Examples
+
+### 1. Adaptive Mesh Refinement (AMR)
+Demonstrates a thermal solver that refines its mesh mid-simulation, seamlessly negotiating the new interpolation mapping with a static-mesh mechanical solver.
+
+Terminal 1:
+```bash
+export PYTHONPATH=src
+python examples/amr_thermal_solver.py
+```
+
+Terminal 2:
+```bash
+export PYTHONPATH=src
+python examples/amr_mechanical_solver.py
+```
+
+### 2. Multiscale FE² Homogenization
+Demonstrates an FE² macro-solver dispatching quadrature-point strains to a pool of microscopic (RVE) workers in parallel, and gathering homogenized stresses.
+
+Terminal 1 (Master):
+```bash
+export PYTHONPATH=src
+python examples/fe2_macro_solver.py
+```
+
+Terminals 2+ (Workers):
+```bash
+# Run this in as many terminals as you want workers!
+export PYTHONPATH=src
+python examples/fe2_micro_worker.py
+```
 
 ## Running Tests
 
-```bash
-# Tests that don't require DOLFINx
-pytest tests/test_communicator.py tests/test_data_mapper.py -v
+Make sure the `src` directory is in your `PYTHONPATH` before running the tests. All tests require `fenics-dolfinx` to be installed in your environment.
 
-# Full test suite (requires DOLFINx)
+```bash
+export PYTHONPATH=src
 pytest tests/ -v
 ```
 
@@ -110,7 +145,7 @@ pytest tests/ -v
 | Phase 2 — IPC Layer | ✅ | `Communicator` with PyZMQ |
 | Phase 3 — Integration & API | ✅ | `CouplingInterface` combining all components |
 | Phase 4 — Mapping | ✅ | `NearestNeighborMapper` with KDTree |
-| Phase 5 — Validation | 🔄 | Benchmark examples & packaging |
+| Phase 5 — Advanced Features | ✅ | `AMR` negotiation and `FE²` parallel dispatch |
 
 ## License
 

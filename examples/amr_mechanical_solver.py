@@ -77,6 +77,9 @@ while t < T_final - 1e-10:
     step += 1
     print(f"\n[StaticMech] === Step {step}, t = {t:.3f} ===")
 
+    # First check for any AMR updates from the partner
+    cosim.check_mesh_update()
+
     # --- Import temperature from thermal solver ---
     cosim.import_data("TemperatureField", temperature)
     print("  Imported TemperatureField")

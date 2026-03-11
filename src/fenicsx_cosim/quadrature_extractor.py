@@ -180,10 +180,8 @@ class QuadratureExtractor:
         # Determine quadrature points per cell from the function space
         # The number of DoFs per cell gives us points_per_cell * dof_per_value
         dofmap = self._function_space.dofmap
-        # Each cell maps to some DoFs; the number of DoFs / dof_per_value
-        # = points per cell
         num_dofs_per_cell = dofmap.dof_layout.num_dofs
-        points_per_cell = num_dofs_per_cell  # for scalar; each quad point is a DoF
+        points_per_cell = num_dofs_per_cell // dof_per_value
 
         total_points = num_cells * points_per_cell
 
@@ -248,7 +246,7 @@ class QuadratureExtractor:
 
         dofmap = function_space.dofmap
         num_dofs_per_cell = dofmap.dof_layout.num_dofs
-        points_per_cell = num_dofs_per_cell
+        points_per_cell = num_dofs_per_cell // dof_per_value
 
         total_points = num_cells * points_per_cell
 

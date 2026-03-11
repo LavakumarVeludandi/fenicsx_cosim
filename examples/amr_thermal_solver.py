@@ -122,6 +122,10 @@ while t < T_final - 1e-10:
 
         has_refined = True
         print(f"  ✅ Mesh refined — now {mesh.topology.index_map(tdim).size_local} cells")
+    else:
+        # Crucial API Call: Perform the AMR negotiation handshake
+        # to confirm to the partner that we did NOT refine.
+        cosim.check_mesh_update()
 
     # --- "Solve" the thermal problem ---
     temperature.interpolate(
