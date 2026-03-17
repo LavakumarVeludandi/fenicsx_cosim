@@ -82,6 +82,10 @@ displacement = dolfinx.fem.Function(V, name="Displacement")
 # Initial temperature: uniform baseline
 temperature.interpolate(lambda x: 300.0 + 100.0 * x[1])
 
+from dolfinx import io
+xdmf = io.XDMFFile(comm, "amr_thermal_output.xdmf", "w")
+xdmf.write_mesh(mesh)
+
 # ========================================================================
 # 5. AMR + Time-Stepping Loop
 # ========================================================================
@@ -121,6 +125,9 @@ while t < T_final - 1e-10:
         )
 
         has_refined = True
+        xdmf.close()
+        xdmf = io.XDMFFile(comm, f"amr_thermal_output_refined.xdmf", "w")
+        xdmf.write_mesh(mesh)
         print(f"  ✅ Mesh refined — now {mesh.topology.index_map(tdim).size_local} cells")
     else:
         # Crucial API Call: Perform the AMR negotiation handshake
@@ -144,6 +151,10 @@ while t < T_final - 1e-10:
     cosim.import_data("DisplacementField", displacement)
     print("  Imported DisplacementField")
 
+    # --- Write Results to XDMF ---
+    xdmf.write_function(temperature, t)
+    xdmf.write_function(displacement, t)
+
     # --- Synchronize ---
     cosim.advance_in_time()
     print(f"  Synchronized (step {cosim.step_count})")
@@ -152,4 +163,5 @@ while t < T_final - 1e-10:
 # 6. Teardown
 # ========================================================================
 cosim.disconnect()
+xdmf.close()
 print(f"\n[AMR_Thermal] Co-simulation complete after {step} steps.")

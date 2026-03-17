@@ -69,6 +69,10 @@ displacement = dolfinx.fem.Function(V, name="Displacement")
 # Initial temperature distribution: linear gradient
 temperature.interpolate(lambda x: 300.0 + 100.0 * x[1])
 
+from dolfinx import io
+xdmf = io.XDMFFile(comm, "thermal_output.xdmf", "w")
+xdmf.write_mesh(mesh)
+
 # ========================================================================
 # 5. Time-Stepping Loop
 # ========================================================================
@@ -101,6 +105,10 @@ while t < T_final - 1e-10:
     cosim.import_data("DisplacementField", displacement)
     print("  Imported DisplacementField")
 
+    # --- Write Results to XDMF ---
+    xdmf.write_function(temperature, t)
+    xdmf.write_function(displacement, t)
+
     # --- Synchronize ---
     cosim.advance_in_time()
     print(f"  Synchronized (step {cosim.step_count})")
@@ -109,4 +117,5 @@ while t < T_final - 1e-10:
 # 6. Teardown
 # ========================================================================
 cosim.disconnect()
+xdmf.close()
 print(f"\n[ThermalSolver] Co-simulation complete after {step} steps.")

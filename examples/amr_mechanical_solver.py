@@ -62,6 +62,10 @@ displacement = dolfinx.fem.Function(V, name="Displacement")
 
 alpha = 1.2e-5  # Thermal expansion coefficient
 
+from dolfinx import io
+xdmf = io.XDMFFile(comm, "amr_mechanical_output.xdmf", "w")
+xdmf.write_mesh(mesh)
+
 # ========================================================================
 # 5. Time-Stepping Loop
 # ========================================================================
@@ -100,6 +104,10 @@ while t < T_final - 1e-10:
     cosim.export_data("DisplacementField", displacement)
     print("  Exported DisplacementField")
 
+    # --- Write Results to XDMF ---
+    xdmf.write_function(temperature, t)
+    xdmf.write_function(displacement, t)
+
     # --- Synchronize ---
     cosim.advance_in_time()
     print(f"  Synchronized (step {cosim.step_count})")
@@ -108,4 +116,5 @@ while t < T_final - 1e-10:
 # 6. Teardown
 # ========================================================================
 cosim.disconnect()
+xdmf.close()
 print(f"\n[StaticMech] Co-simulation complete after {step} steps.")

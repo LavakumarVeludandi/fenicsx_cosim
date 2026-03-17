@@ -28,3 +28,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Simulation Output
+*.xdmf
+*.h5
