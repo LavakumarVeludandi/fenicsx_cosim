@@ -1,0 +1,25 @@
+
+services:
+  fe2_macro:
+    image: wingsoflava/fenicsx-cosim:nightly
+    container_name: thermal_solver
+    command: ["python3", "examples/thermal_solver.py", "0.0.0.0"]
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    networks:
+      - fe2net
+
+  fe2_micro:
+    image: wingsoflava/fenicsx-cosim:nightly
+    container_name: mechanical_solver
+    command: ["python3", "examples/mechanical_solver.py", "thermal_solver"]
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    networks:
+      - fe2net
+
+networks:
+  fe2net:
+    driver: bridge

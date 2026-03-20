@@ -20,6 +20,7 @@ The mechanical solver:
 import dolfinx
 import dolfinx.fem
 import dolfinx.mesh
+import sys
 import numpy as np
 from mpi4py import MPI
 
@@ -52,10 +53,14 @@ facet_tags = dolfinx.mesh.meshtags(
 # ========================================================================
 # 3. Set Up Co-Simulation
 # ========================================================================
+host = sys.argv[1] if len(sys.argv) > 1 else "localhost"
+endpoint = "tcp://*:5555" if host == "0.0.0.0" else f"tcp://{host}:5555"
+
 cosim = CouplingInterface(
     name="MechanicalSolver",
     partner_name="ThermalSolver",
-    connection_type="tcp",
+    role="connect",
+    endpoint=endpoint,
 )
 cosim.register_interface(mesh, facet_tags, marker_id=1, function_space=V)
 
