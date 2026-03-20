@@ -1,4 +1,9 @@
+
 # fenicsx-cosim
+
+[![Documentation Status](https://img.shields.io/badge/docs-online-blue)](https://lavakumarveludandi.github.io/fenicsx_cosim/)
+
+**Documentation:** [https://lavakumarveludandi.github.io/fenicsx_cosim/](https://lavakumarveludandi.github.io/fenicsx_cosim/)
 
 **A Native Partitioned Multiphysics Coupling Library for FEniCSx**
 
