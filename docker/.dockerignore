@@ -1,0 +1,27 @@
+# .dockerignore
+# Prevents unnecessary files from being copied into the Docker image
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+build/
+dist/
+.docker/
+.dockerignore
+Dockerfile
+.git/
+.gitignore
+.vscode/
+.env
+*.h5
+*.xdmf
+examples/*.h5
+examples/*.xdmf
+examples/
+# Exclude everything except what is needed for build
+!src/
+!pyproject.toml
+!requirements.txt
+!README.md
+!tests/

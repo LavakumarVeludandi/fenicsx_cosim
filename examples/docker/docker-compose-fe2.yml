@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  fe2_macro:
+    image: wingsoflava/fenicsx-cosim:nightly
+    container_name: fe2_macro
+    command: ["python3", "examples/fe2_macro_solver.py"]
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    networks:
+      - fe2net
+
+  fe2_micro:
+    image: wingsoflava/fenicsx-cosim:nightly
+    container_name: fe2_micro
+    command: ["python3", "examples/fe2_micro_worker.py"]
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    networks:
+      - fe2net
+
+networks:
+  fe2net:
+    driver: bridge
