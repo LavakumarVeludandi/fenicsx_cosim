@@ -27,7 +27,7 @@ extensions = [
     'myst_parser',
 ]
 
-autodoc_mock_imports = ['dolfinx', 'basix', 'mpi4py', 'ufl', 'petsc4py']
+autodoc_mock_imports = ['dolfinx', 'basix', 'mpi4py', 'ufl', 'petsc4py', 'scipy', 'zmq']
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
