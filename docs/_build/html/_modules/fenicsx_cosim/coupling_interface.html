@@ -1,0 +1,941 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>fenicsx_cosim.coupling_interface &mdash; FEniCSx CoSim nightly documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=028fc1c9"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            FEniCSx CoSim
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">fenicsx_cosim</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">FEniCSx CoSim</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">fenicsx_cosim.coupling_interface</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for fenicsx_cosim.coupling_interface</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">CouplingInterface — The main user-facing API for fenicsx-cosim.</span>
+
+<span class="sd">This class integrates the ``MeshExtractor``, ``Communicator``, and</span>
+<span class="sd">``DataMapper`` into a single, clean entry point that hides all</span>
+<span class="sd">networking and mapping details from the user.</span>
+
+<span class="sd">It is the FEniCSx analogue of the top-level ``CoSimIO.Connect`` /</span>
+<span class="sd">``ExportData`` / ``ImportData`` workflow in Kratos CoSimIO.</span>
+
+<span class="sd">Additionally, it now supports:</span>
+
+<span class="sd">* **Adaptive Mesh Refinement (AMR):** via ``update_interface_geometry()``</span>
+<span class="sd">  which re-negotiates the mapping with the partner solver.</span>
+<span class="sd">* **FE² Multiscale Homogenization:** via ``register_quadrature_space()``,</span>
+<span class="sd">  ``scatter_data()``, and ``gather_data()`` for dispatching integration-</span>
+<span class="sd">  point tensors to a pool of RVE solver workers.</span>
+
+<span class="sd">Typical usage (Standard Boundary Coupling)</span>
+<span class="sd">-------------------------------------------</span>
+<span class="sd">&gt;&gt;&gt; from fenicsx_cosim import CouplingInterface</span>
+<span class="sd">&gt;&gt;&gt; cosim = CouplingInterface(</span>
+<span class="sd">...     name=&quot;ThermalSolver&quot;,</span>
+<span class="sd">...     partner_name=&quot;MechanicalSolver&quot;,</span>
+<span class="sd">... )</span>
+<span class="sd">&gt;&gt;&gt; cosim.register_interface(mesh, facet_tags, marker_id=1, function_space=V)</span>
+<span class="sd">&gt;&gt;&gt; cosim.export_data(&quot;TemperatureField&quot;, temperature)</span>
+<span class="sd">&gt;&gt;&gt; cosim.import_data(&quot;DisplacementField&quot;, displacement)</span>
+<span class="sd">&gt;&gt;&gt; cosim.advance_in_time()</span>
+
+<span class="sd">Typical usage (FE² Scatter-Gather)</span>
+<span class="sd">-----------------------------------</span>
+<span class="sd">&gt;&gt;&gt; cosim_fe2 = CouplingInterface(name=&quot;Macro&quot;, role=&quot;Master&quot;,</span>
+<span class="sd">...     topology=&quot;scatter-gather&quot;)</span>
+<span class="sd">&gt;&gt;&gt; cosim_fe2.register_quadrature_space(V_quad)</span>
+<span class="sd">&gt;&gt;&gt; cosim_fe2.scatter_data(&quot;StrainTensor&quot;, macro_strains)</span>
+<span class="sd">&gt;&gt;&gt; stresses = cosim_fe2.gather_data(&quot;StressTensor&quot;)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.communicator</span><span class="w"> </span><span class="kn">import</span> <span class="n">Communicator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.data_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataMapper</span><span class="p">,</span> <span class="n">NearestNeighborMapper</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.dynamic_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">DynamicMapper</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.mesh_extractor</span><span class="w"> </span><span class="kn">import</span> <span class="n">MeshExtractor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.quadrature_extractor</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuadratureExtractor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.scatter_gather_communicator</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScatterGatherCommunicator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Lazy dolfinx import</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dolfinx</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dolfinx.fem</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dolfinx.mesh</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="k">pass</span>  <span class="c1"># Will be caught by MeshExtractor</span>
+
+
+<div class="viewcode-block" id="CouplingInterface">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CouplingInterface</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;High-level co-simulation coupling API for FEniCSx solvers.</span>
+
+<span class="sd">    This is the **single entry point** that researchers interact with.</span>
+<span class="sd">    It orchestrates boundary-data extraction, inter-process</span>
+<span class="sd">    communication, and (optionally) non-conforming mesh mapping.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    name : str</span>
+<span class="sd">        A unique identifier for *this* solver instance (e.g.</span>
+<span class="sd">        ``&quot;ThermalSolver&quot;``).</span>
+<span class="sd">    partner_name : str</span>
+<span class="sd">        The identifier of the partner solver.  For ``scatter-gather``</span>
+<span class="sd">        topology, this can be set to ``&quot;Workers&quot;``.</span>
+<span class="sd">    role : {&quot;bind&quot;, &quot;connect&quot;, &quot;Master&quot;, &quot;Worker&quot;}, optional</span>
+<span class="sd">        ZeroMQ role.  The solver that starts first should ``&quot;bind&quot;``;</span>
+<span class="sd">        the one that starts second should ``&quot;connect&quot;``.  If ``None``</span>
+<span class="sd">        (default), the role is determined automatically by sorting the</span>
+<span class="sd">        names lexicographically — the name that comes first binds.</span>
+<span class="sd">        Use ``&quot;Master&quot;`` / ``&quot;Worker&quot;`` for scatter-gather topology.</span>
+<span class="sd">    endpoint : str, optional</span>
+<span class="sd">        ZeroMQ endpoint.  Default ``&quot;tcp://localhost:5555&quot;``.</span>
+<span class="sd">    connection_type : {&quot;tcp&quot;, &quot;ipc&quot;}, optional</span>
+<span class="sd">        Shortcut to auto-generate an endpoint.  Ignored if *endpoint*</span>
+<span class="sd">        is explicitly provided.</span>
+<span class="sd">    timeout_ms : int, optional</span>
+<span class="sd">        Receive timeout in ms (default 30 000).</span>
+<span class="sd">    enable_mapping : bool, optional</span>
+<span class="sd">        If ``True`` (default), a ``NearestNeighborMapper`` is built</span>
+<span class="sd">        automatically when both sides exchange boundary coordinates.</span>
+<span class="sd">    topology : {&quot;pair&quot;, &quot;scatter-gather&quot;}, optional</span>
+<span class="sd">        Communication topology.  ``&quot;pair&quot;`` (default) uses the standard</span>
+<span class="sd">        ``zmq.PAIR`` socket for 1-to-1 coupling.  ``&quot;scatter-gather&quot;``</span>
+<span class="sd">        uses ``PUSH/PULL`` for FE² fan-out / fan-in.</span>
+<span class="sd">    push_endpoint : str, optional</span>
+<span class="sd">        For ``scatter-gather`` only: PUSH socket endpoint.</span>
+<span class="sd">    pull_endpoint : str, optional</span>
+<span class="sd">        For ``scatter-gather`` only: PULL socket endpoint.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">partner_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Workers&quot;</span><span class="p">,</span>
+        <span class="n">role</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">endpoint</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">connection_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;tcp&quot;</span><span class="p">,</span>
+        <span class="n">timeout_ms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30_000</span><span class="p">,</span>
+        <span class="n">enable_mapping</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">topology</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pair&quot;</span><span class="p">,</span>
+        <span class="n">push_endpoint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;tcp://*:5556&quot;</span><span class="p">,</span>
+        <span class="n">pull_endpoint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;tcp://*:5557&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">partner_name</span> <span class="o">=</span> <span class="n">partner_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">enable_mapping</span> <span class="o">=</span> <span class="n">enable_mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">topology</span> <span class="o">=</span> <span class="n">topology</span>
+
+        <span class="c1"># --- Internal components (common) --------------------------------</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span> <span class="o">=</span> <span class="n">MeshExtractor</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quad_extractor</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">QuadratureExtractor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataMapper</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_mapper</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicMapper</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_partner_coords</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_registered</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quad_registered</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_step_count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_disconnected</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># --- Topology-specific setup ------------------------------------</span>
+        <span class="k">if</span> <span class="n">topology</span> <span class="o">==</span> <span class="s2">&quot;scatter-gather&quot;</span><span class="p">:</span>
+            <span class="c1"># FE² scatter-gather mode</span>
+            <span class="n">sg_role</span> <span class="o">=</span> <span class="s2">&quot;master&quot;</span> <span class="k">if</span> <span class="n">role</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;Master&quot;</span><span class="p">,</span> <span class="s2">&quot;bind&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;worker&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sg_communicator</span> <span class="o">=</span> <span class="n">ScatterGatherCommunicator</span><span class="p">(</span>
+                <span class="n">role</span><span class="o">=</span><span class="n">sg_role</span><span class="p">,</span>
+                <span class="n">push_endpoint</span><span class="o">=</span><span class="n">push_endpoint</span><span class="p">,</span>
+                <span class="n">pull_endpoint</span><span class="o">=</span><span class="n">pull_endpoint</span><span class="p">,</span>
+                <span class="n">timeout_ms</span><span class="o">=</span><span class="n">timeout_ms</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">role</span> <span class="o">=</span> <span class="n">sg_role</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] CouplingInterface ready (scatter-gather, role=</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span> <span class="n">sg_role</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Standard PAIR mode</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sg_communicator</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="c1"># Determine role automatically if not specified</span>
+            <span class="k">if</span> <span class="n">role</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">role</span> <span class="o">=</span> <span class="s2">&quot;bind&quot;</span> <span class="k">if</span> <span class="n">name</span> <span class="o">&lt;</span> <span class="n">partner_name</span> <span class="k">else</span> <span class="s2">&quot;connect&quot;</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Auto-assigned role=&#39;</span><span class="si">%s</span><span class="s2">&#39; (partner=&#39;</span><span class="si">%s</span><span class="s2">&#39;)&quot;</span><span class="p">,</span>
+                    <span class="n">name</span><span class="p">,</span> <span class="n">role</span><span class="p">,</span> <span class="n">partner_name</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">role</span> <span class="o">==</span> <span class="s2">&quot;Master&quot;</span><span class="p">:</span>
+                <span class="n">role</span> <span class="o">=</span> <span class="s2">&quot;bind&quot;</span>
+            <span class="k">elif</span> <span class="n">role</span> <span class="o">==</span> <span class="s2">&quot;Worker&quot;</span><span class="p">:</span>
+                <span class="n">role</span> <span class="o">=</span> <span class="s2">&quot;connect&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">role</span> <span class="o">=</span> <span class="n">role</span>
+
+            <span class="c1"># Determine endpoint</span>
+            <span class="k">if</span> <span class="n">endpoint</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">conn_name</span> <span class="o">=</span> <span class="s2">&quot;_&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">([</span><span class="n">name</span><span class="p">,</span> <span class="n">partner_name</span><span class="p">]))</span>
+                <span class="k">if</span> <span class="n">connection_type</span> <span class="o">==</span> <span class="s2">&quot;ipc&quot;</span><span class="p">:</span>
+                    <span class="n">endpoint</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;ipc:///tmp/fenicsx_cosim_</span><span class="si">{</span><span class="n">conn_name</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">endpoint</span> <span class="o">=</span> <span class="s2">&quot;tcp://localhost:5555&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">endpoint</span> <span class="o">=</span> <span class="n">endpoint</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span> <span class="o">=</span> <span class="n">Communicator</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">partner_name</span><span class="o">=</span><span class="n">partner_name</span><span class="p">,</span>
+                <span class="n">role</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">role</span><span class="p">,</span>
+                <span class="n">endpoint</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">endpoint</span><span class="p">,</span>
+                <span class="n">timeout_ms</span><span class="o">=</span><span class="n">timeout_ms</span><span class="p">,</span>
+                <span class="n">handshake</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] CouplingInterface ready — partner=&#39;</span><span class="si">%s</span><span class="s2">&#39;, endpoint=&#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span><span class="p">,</span>
+                <span class="n">name</span><span class="p">,</span> <span class="n">partner_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">endpoint</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="c1"># ==================================================================</span>
+    <span class="c1"># Interface registration (standard boundary coupling)</span>
+    <span class="c1"># ==================================================================</span>
+
+<div class="viewcode-block" id="CouplingInterface.register_interface">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.register_interface">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_interface</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.Mesh&quot;</span><span class="p">,</span>
+        <span class="n">facet_tags</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.MeshTags&quot;</span><span class="p">,</span>
+        <span class="n">marker_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">function_space</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="s2">&quot;dolfinx.fem.FunctionSpace&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register the coupling boundary and exchange coordinates with the</span>
+<span class="sd">        partner solver.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        mesh : dolfinx.mesh.Mesh</span>
+<span class="sd">            The computational mesh.</span>
+<span class="sd">        facet_tags : dolfinx.mesh.MeshTags</span>
+<span class="sd">            Mesh tags labelling boundary facets.</span>
+<span class="sd">        marker_id : int</span>
+<span class="sd">            The integer marker for the coupling boundary.</span>
+<span class="sd">        function_space : dolfinx.fem.FunctionSpace, optional</span>
+<span class="sd">            The function space. If ``None``, a default scalar Lagrange-1</span>
+<span class="sd">            space is created on *mesh*.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Default function space</span>
+        <span class="k">if</span> <span class="n">function_space</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">function_space</span> <span class="o">=</span> <span class="n">dolfinx</span><span class="o">.</span><span class="n">fem</span><span class="o">.</span><span class="n">functionspace</span><span class="p">(</span>
+                <span class="n">mesh</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;Lagrange&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="n">function_space</span>
+
+        <span class="c1"># Extract boundary information</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">facet_tags</span><span class="p">,</span> <span class="n">marker_id</span><span class="p">,</span> <span class="n">function_space</span><span class="p">)</span>
+
+        <span class="c1"># Exchange boundary coordinates with partner for mapping</span>
+        <span class="n">my_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">boundary_coordinates</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_exchange_coordinates</span><span class="p">(</span><span class="n">my_coords</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_registered</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Interface registered — </span><span class="si">%d</span><span class="s2"> boundary DoFs&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">boundary_dof_indices</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CouplingInterface.register_interface_from_locator">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.register_interface_from_locator">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_interface_from_locator</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.Mesh&quot;</span><span class="p">,</span>
+        <span class="n">locator_fn</span><span class="p">,</span>
+        <span class="n">function_space</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="s2">&quot;dolfinx.fem.FunctionSpace&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">marker_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register the coupling boundary using a geometric locator function.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        mesh : dolfinx.mesh.Mesh</span>
+<span class="sd">            The computational mesh.</span>
+<span class="sd">        locator_fn : callable</span>
+<span class="sd">            ``locator_fn(x: ndarray) -&gt; ndarray[bool]``</span>
+<span class="sd">        function_space : dolfinx.fem.FunctionSpace, optional</span>
+<span class="sd">            Defaults to Lagrange-1.</span>
+<span class="sd">        marker_id : int, optional</span>
+<span class="sd">            Label for this boundary.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">function_space</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">function_space</span> <span class="o">=</span> <span class="n">dolfinx</span><span class="o">.</span><span class="n">fem</span><span class="o">.</span><span class="n">functionspace</span><span class="p">(</span>
+                <span class="n">mesh</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;Lagrange&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="n">function_space</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">register_from_locator</span><span class="p">(</span>
+            <span class="n">mesh</span><span class="p">,</span> <span class="n">locator_fn</span><span class="p">,</span> <span class="n">function_space</span><span class="p">,</span> <span class="n">marker_id</span>
+        <span class="p">)</span>
+
+        <span class="n">my_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">boundary_coordinates</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_exchange_coordinates</span><span class="p">(</span><span class="n">my_coords</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_registered</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Interface registered (locator) — </span><span class="si">%d</span><span class="s2"> boundary DoFs&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">boundary_dof_indices</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_exchange_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">my_coords</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Exchange boundary coordinates with the partner and build the</span>
+<span class="sd">        data mapper if needed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="s2">&quot;bind&quot;</span><span class="p">:</span>
+            <span class="c1"># Send our coordinates, then receive partner&#39;s</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">send_array</span><span class="p">(</span><span class="s2">&quot;boundary_coords&quot;</span><span class="p">,</span> <span class="n">my_coords</span><span class="p">)</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">partner_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">receive_array</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Receive partner&#39;s coordinates, then send ours</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">partner_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">receive_array</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">send_array</span><span class="p">(</span><span class="s2">&quot;boundary_coords&quot;</span><span class="p">,</span> <span class="n">my_coords</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_partner_coords</span> <span class="o">=</span> <span class="n">partner_coords</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Exchanged coordinates — local: </span><span class="si">%d</span><span class="s2"> pts, partner: </span><span class="si">%d</span><span class="s2"> pts&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">my_coords</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">partner_coords</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Build the mapper</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enable_mapping</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">my_coords</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">partner_coords</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># Use the DynamicMapper so AMR updates are seamless</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_mapper</span> <span class="o">=</span> <span class="n">DynamicMapper</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_mapper</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+                <span class="n">source_coords</span><span class="o">=</span><span class="n">partner_coords</span><span class="p">,</span>
+                <span class="n">target_coords</span><span class="o">=</span><span class="n">my_coords</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="c1"># Also keep a reference as the generic mapper</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span> <span class="o">=</span> <span class="n">NearestNeighborMapper</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+                <span class="n">source_coords</span><span class="o">=</span><span class="n">partner_coords</span><span class="p">,</span>
+                <span class="n">target_coords</span><span class="o">=</span><span class="n">my_coords</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="c1"># ==================================================================</span>
+    <span class="c1"># AMR: Update interface geometry</span>
+    <span class="c1"># ==================================================================</span>
+
+<div class="viewcode-block" id="CouplingInterface.update_interface_geometry">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.update_interface_geometry">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_interface_geometry</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.Mesh&quot;</span><span class="p">,</span>
+        <span class="n">facet_tags</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.MeshTags&quot;</span><span class="p">,</span>
+        <span class="n">marker_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">function_space</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="s2">&quot;dolfinx.fem.FunctionSpace&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Notify the coupling system that the mesh has been refined (AMR).</span>
+
+<span class="sd">        This method:</span>
+
+<span class="sd">        1. Re-extracts boundary DoFs from the refined mesh.</span>
+<span class="sd">        2. Invalidates the current data mapping.</span>
+<span class="sd">        3. Negotiates a synchronized coordinate exchange with the</span>
+<span class="sd">           partner solver.</span>
+<span class="sd">        4. Rebuilds the ``DynamicMapper`` with the updated point clouds.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        mesh : dolfinx.mesh.Mesh</span>
+<span class="sd">            The **newly refined** mesh.</span>
+<span class="sd">        facet_tags : dolfinx.mesh.MeshTags</span>
+<span class="sd">            Updated facet tags for the refined mesh.</span>
+<span class="sd">        marker_id : int</span>
+<span class="sd">            The coupling boundary marker.</span>
+<span class="sd">        function_space : dolfinx.fem.FunctionSpace, optional</span>
+<span class="sd">            Updated function space (if ``None``, a new Lagrange-1 space</span>
+<span class="sd">            is created on the refined mesh).</span>
+
+<span class="sd">        See Also</span>
+<span class="sd">        --------</span>
+<span class="sd">        DynamicMapper.negotiate_update</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">function_space</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">function_space</span> <span class="o">=</span> <span class="n">dolfinx</span><span class="o">.</span><span class="n">fem</span><span class="o">.</span><span class="n">functionspace</span><span class="p">(</span>
+                <span class="n">mesh</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;Lagrange&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="n">function_space</span>
+
+        <span class="c1"># Re-extract boundary data from the refined mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">facet_tags</span><span class="p">,</span> <span class="n">marker_id</span><span class="p">,</span> <span class="n">function_space</span><span class="p">)</span>
+        <span class="n">my_new_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">boundary_coordinates</span>
+
+        <span class="c1"># Invalidate and negotiate with partner</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_mapper</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_mapper</span><span class="o">.</span><span class="n">invalidate</span><span class="p">()</span>
+            <span class="n">partner_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_mapper</span><span class="o">.</span><span class="n">negotiate_update</span><span class="p">(</span>
+                <span class="n">communicator</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="p">,</span>
+                <span class="n">role</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">role</span><span class="p">,</span>
+                <span class="n">my_new_coords</span><span class="o">=</span><span class="n">my_new_coords</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">partner_coords</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_partner_coords</span> <span class="o">=</span> <span class="n">partner_coords</span>
+
+                <span class="c1"># Also rebuild the plain NearestNeighborMapper</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span> <span class="o">=</span> <span class="n">NearestNeighborMapper</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+                    <span class="n">source_coords</span><span class="o">=</span><span class="n">partner_coords</span><span class="p">,</span>
+                    <span class="n">target_coords</span><span class="o">=</span><span class="n">my_new_coords</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Fallback: full coordinate re-exchange</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_exchange_coordinates</span><span class="p">(</span><span class="n">my_new_coords</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Interface geometry updated (AMR) — </span><span class="si">%d</span><span class="s2"> boundary DoFs&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">boundary_dof_indices</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CouplingInterface.check_mesh_update">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.check_mesh_update">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_mesh_update</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Lightweight check to see if the partner solver updated its mesh.</span>
+
+<span class="sd">        If the partner calls ``update_interface_geometry()``, *this* solver</span>
+<span class="sd">        must call ``check_mesh_update()`` at the same point in the time</span>
+<span class="sd">        loop to receive the new coordinates and re-build the mapping.</span>
+
+<span class="sd">        If *neither* solver refined its mesh but AMR is active, both solvers</span>
+<span class="sd">        should call ``check_mesh_update()`` to acknowledge no changes.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        bool</span>
+<span class="sd">            ``True`` if the partner updated its mesh and the mapping was</span>
+<span class="sd">            rebuilt; ``False`` otherwise.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_mapper</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">partner_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_mapper</span><span class="o">.</span><span class="n">negotiate_update</span><span class="p">(</span>
+            <span class="n">communicator</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="p">,</span>
+            <span class="n">role</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">role</span><span class="p">,</span>
+            <span class="n">my_new_coords</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">partner_coords</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_partner_coords</span> <span class="o">=</span> <span class="n">partner_coords</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span> <span class="o">=</span> <span class="n">NearestNeighborMapper</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+                <span class="n">source_coords</span><span class="o">=</span><span class="n">partner_coords</span><span class="p">,</span>
+                <span class="n">target_coords</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">boundary_coordinates</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Responded to partner&#39;s mesh update.&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+    <span class="c1"># ==================================================================</span>
+    <span class="c1"># FE²: Quadrature space registration</span>
+    <span class="c1"># ==================================================================</span>
+
+<div class="viewcode-block" id="CouplingInterface.register_quadrature_space">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.register_quadrature_space">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_quadrature_space</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">function_space_or_mesh</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">quadrature_degree</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="n">tensor_shape</span><span class="o">=</span><span class="p">(),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a Quadrature function space for FE² homogenization.</span>
+
+<span class="sd">        This replaces the standard boundary registration and instead</span>
+<span class="sd">        sets up data exchange at integration points.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function_space_or_mesh : dolfinx.fem.FunctionSpace or dolfinx.mesh.Mesh</span>
+<span class="sd">            Either a pre-existing Quadrature function space, or a mesh</span>
+<span class="sd">            on which to create one.</span>
+<span class="sd">        quadrature_degree : int, optional</span>
+<span class="sd">            If a mesh is provided, the quadrature degree.  Default 2.</span>
+<span class="sd">        tensor_shape : tuple[int, ...], optional</span>
+<span class="sd">            Shape of the tensor at each integration point.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quad_extractor</span> <span class="o">=</span> <span class="n">QuadratureExtractor</span><span class="p">()</span>
+
+        <span class="c1"># Determine if we got a function space or a mesh</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">function_space_or_mesh</span><span class="p">,</span> <span class="s2">&quot;dofmap&quot;</span><span class="p">):</span>
+            <span class="c1"># It&#39;s a function space</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_quad_extractor</span><span class="o">.</span><span class="n">register_with_function_space</span><span class="p">(</span>
+                <span class="n">function_space_or_mesh</span><span class="p">,</span> <span class="n">tensor_shape</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># It&#39;s a mesh</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_quad_extractor</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
+                <span class="n">function_space_or_mesh</span><span class="p">,</span>
+                <span class="n">quadrature_degree</span><span class="o">=</span><span class="n">quadrature_degree</span><span class="p">,</span>
+                <span class="n">tensor_shape</span><span class="o">=</span><span class="n">tensor_shape</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quad_registered</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">qd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_extractor</span><span class="o">.</span><span class="n">quadrature_data</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Quadrature space registered — </span><span class="si">%d</span><span class="s2"> cells × </span><span class="si">%d</span><span class="s2"> pts/cell &quot;</span>
+            <span class="s2">&quot;= </span><span class="si">%d</span><span class="s2"> total integration points&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">qd</span><span class="o">.</span><span class="n">num_cells</span><span class="p">,</span> <span class="n">qd</span><span class="o">.</span><span class="n">points_per_cell</span><span class="p">,</span> <span class="n">qd</span><span class="o">.</span><span class="n">total_points</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+    <span class="c1"># ==================================================================</span>
+    <span class="c1"># FE²: Scatter / Gather</span>
+    <span class="c1"># ==================================================================</span>
+
+<div class="viewcode-block" id="CouplingInterface.scatter_data">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.scatter_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">scatter_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">data_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">,</span>
+        <span class="n">metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract per-cell integration-point values and scatter them to</span>
+<span class="sd">        the RVE worker pool.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data_name : str</span>
+<span class="sd">            Name identifier (e.g. ``&quot;StrainTensor&quot;``).</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            Source function on the Quadrature space.</span>
+<span class="sd">        metadata : list[dict], optional</span>
+<span class="sd">            Optional per-cell metadata (material params, damage state).</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        int</span>
+<span class="sd">            Number of work items dispatched.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_scatter_gather</span><span class="p">(</span><span class="s2">&quot;scatter_data&quot;</span><span class="p">)</span>
+        <span class="n">cell_values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_extractor</span><span class="o">.</span><span class="n">extract_for_dispatch</span><span class="p">(</span><span class="n">function</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sg_communicator</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">cell_values</span><span class="p">,</span> <span class="n">metadata</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Scattered &#39;</span><span class="si">%s</span><span class="s2">&#39; — </span><span class="si">%d</span><span class="s2"> cells&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">data_name</span><span class="p">,</span> <span class="n">n</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">n</span></div>
+
+
+<div class="viewcode-block" id="CouplingInterface.gather_data">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.gather_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">gather_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">data_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">n_expected</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gather results from the RVE worker pool and optionally inject</span>
+<span class="sd">        them into a Quadrature function.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data_name : str</span>
+<span class="sd">            Name identifier (e.g. ``&quot;StressTensor&quot;``).</span>
+<span class="sd">        function : dolfinx.fem.Function, optional</span>
+<span class="sd">            If provided, the gathered values are injected into this</span>
+<span class="sd">            Quadrature function.</span>
+<span class="sd">        n_expected : int, optional</span>
+<span class="sd">            Number of results to wait for.  Defaults to</span>
+<span class="sd">            ``quadrature_data.num_cells``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list[np.ndarray]</span>
+<span class="sd">            The gathered per-cell result arrays.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_scatter_gather</span><span class="p">(</span><span class="s2">&quot;gather_data&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n_expected</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">n_expected</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_extractor</span><span class="o">.</span><span class="n">quadrature_data</span><span class="o">.</span><span class="n">num_cells</span>
+
+        <span class="n">results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sg_communicator</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="n">n_expected</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Gathered &#39;</span><span class="si">%s</span><span class="s2">&#39; — </span><span class="si">%d</span><span class="s2"> results&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">data_name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">function</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_quad_extractor</span><span class="o">.</span><span class="n">inject_from_gather</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Injected &#39;</span><span class="si">%s</span><span class="s2">&#39; into Quadrature function&quot;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">data_name</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">results</span></div>
+
+
+<div class="viewcode-block" id="CouplingInterface.scatter_gather_data">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.scatter_gather_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">scatter_gather_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">scatter_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">scatter_function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">,</span>
+        <span class="n">gather_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">gather_function</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convenience: scatter, then gather in one call.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        scatter_name : str</span>
+<span class="sd">            Name for the outgoing data.</span>
+<span class="sd">        scatter_function : dolfinx.fem.Function</span>
+<span class="sd">            Source Quadrature function.</span>
+<span class="sd">        gather_name : str</span>
+<span class="sd">            Name for the incoming data.</span>
+<span class="sd">        gather_function : dolfinx.fem.Function, optional</span>
+<span class="sd">            Target Quadrature function for injection.</span>
+<span class="sd">        metadata : list[dict], optional</span>
+<span class="sd">            Per-cell metadata.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list[np.ndarray]</span>
+<span class="sd">            Gathered results.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scatter_data</span><span class="p">(</span><span class="n">scatter_name</span><span class="p">,</span> <span class="n">scatter_function</span><span class="p">,</span> <span class="n">metadata</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">gather_data</span><span class="p">(</span><span class="n">gather_name</span><span class="p">,</span> <span class="n">gather_function</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span></div>
+
+
+    <span class="c1"># ==================================================================</span>
+    <span class="c1"># Standard data exchange (boundary coupling)</span>
+    <span class="c1"># ==================================================================</span>
+
+<div class="viewcode-block" id="CouplingInterface.export_data">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.export_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">export_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">data_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract boundary values from a FEniCSx Function and send them</span>
+<span class="sd">        to the partner solver.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data_name : str</span>
+<span class="sd">            Identifier for the data (e.g. ``&quot;TemperatureField&quot;``).</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            The FEniCSx function whose boundary values are to be sent.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">extract_boundary_values</span><span class="p">(</span><span class="n">function</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">send_array</span><span class="p">(</span><span class="n">data_name</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Exported &#39;</span><span class="si">%s</span><span class="s2">&#39; — </span><span class="si">%d</span><span class="s2"> values&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">data_name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CouplingInterface.import_data">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.import_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">import_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">data_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Receive boundary values from the partner solver and inject</span>
+<span class="sd">        them into a FEniCSx Function.</span>
+
+<span class="sd">        If the meshes are non-conforming (different DoF coordinates),</span>
+<span class="sd">        the received values are first mapped using the ``DataMapper``</span>
+<span class="sd">        before injection.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data_name : str</span>
+<span class="sd">            Expected identifier for the incoming data.</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            The target FEniCSx function.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="n">received_name</span><span class="p">,</span> <span class="n">received_values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">receive_array</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">received_name</span> <span class="o">!=</span> <span class="n">data_name</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Expected data &#39;</span><span class="si">%s</span><span class="s2">&#39; but received &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">data_name</span><span class="p">,</span> <span class="n">received_name</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Apply mapping if meshes differ</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">mapped_values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">received_values</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mapped_values</span> <span class="o">=</span> <span class="n">received_values</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">inject_boundary_values</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">mapped_values</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Imported &#39;</span><span class="si">%s</span><span class="s2">&#39; — </span><span class="si">%d</span><span class="s2"> values injected&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">received_name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">mapped_values</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CouplingInterface.export_raw">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.export_raw">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">export_raw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">array</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="s2">&quot;sps.csr_matrix&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Send a raw NumPy array or SciPy sparse matrix to the partner solver.</span>
+
+<span class="sd">        This is useful for sending non-field data like sparse stiffness matrices</span>
+<span class="sd">        or scalar values (e.g. for Shakedown analysis or custom optimization loops).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data_name : str</span>
+<span class="sd">            Identifier for the data.</span>
+<span class="sd">        array : np.ndarray or scipy.sparse.spmatrix</span>
+<span class="sd">            The raw data to transmit.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">send_array</span><span class="p">(</span><span class="n">data_name</span><span class="p">,</span> <span class="n">array</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">array</span><span class="p">,</span> <span class="s2">&quot;shape&quot;</span><span class="p">):</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">array</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Exported raw data &#39;</span><span class="si">%s</span><span class="s2">&#39; — shape </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">data_name</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CouplingInterface.import_raw">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.import_raw">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">import_raw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="s2">&quot;sps.csr_matrix&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Receive a raw NumPy array or SciPy sparse matrix from the partner solver.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data_name : str</span>
+<span class="sd">            Expected identifier for the incoming data.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray or scipy.sparse.spmatrix</span>
+<span class="sd">            The raw data received.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">received_name</span><span class="p">,</span> <span class="n">received_values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">receive_array</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">received_name</span> <span class="o">!=</span> <span class="n">data_name</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Expected raw data &#39;</span><span class="si">%s</span><span class="s2">&#39; but received &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">data_name</span><span class="p">,</span> <span class="n">received_name</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">received_values</span><span class="p">,</span> <span class="s2">&quot;shape&quot;</span><span class="p">):</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="n">received_values</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">received_values</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Imported raw data &#39;</span><span class="si">%s</span><span class="s2">&#39; — shape </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">received_name</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">received_values</span></div>
+
+
+    <span class="c1"># ==================================================================</span>
+    <span class="c1"># Synchronization</span>
+    <span class="c1"># ==================================================================</span>
+
+<div class="viewcode-block" id="CouplingInterface.advance_in_time">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.advance_in_time">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">advance_in_time</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Synchronize both solvers at the end of a time step.</span>
+
+<span class="sd">        This acts as a barrier — neither solver proceeds until both</span>
+<span class="sd">        have called ``advance_in_time()``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_step_count</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Time step </span><span class="si">%d</span><span class="s2"> complete&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_step_count</span>
+        <span class="p">)</span></div>
+
+
+    <span class="c1"># ==================================================================</span>
+    <span class="c1"># Accessors</span>
+    <span class="c1"># ==================================================================</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">boundary_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Boundary DoF coordinates of *this* solver — shape ``(N, 3)``.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span><span class="o">.</span><span class="n">boundary_coordinates</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">partner_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Boundary DoF coordinates received from the partner.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partner_coords</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mapper</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataMapper</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The data mapper (if mapping is enabled and built).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dynamic_mapper</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicMapper</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The dynamic (AMR-aware) mapper, if active.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dynamic_mapper</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">quadrature_extractor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">QuadratureExtractor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The quadrature extractor, if registered.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_extractor</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">step_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of completed time steps.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_step_count</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extractor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MeshExtractor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The underlying mesh extractor.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extractor</span>
+
+    <span class="c1"># ==================================================================</span>
+    <span class="c1"># Lifecycle</span>
+    <span class="c1"># ==================================================================</span>
+
+<div class="viewcode-block" id="CouplingInterface.disconnect">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.disconnect">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gracefully close the connection to the partner solver.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_disconnected&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_communicator</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sg_communicator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sg_communicator</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">] Disconnected&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_disconnected</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_registered</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registered</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">] No interface registered. &quot;</span>
+                <span class="s2">&quot;Call register_interface() first.&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_scatter_gather</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sg_communicator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">() requires topology=&#39;scatter-gather&#39;. &quot;</span>
+                <span class="s2">&quot;Initialize with: CouplingInterface(..., topology=&#39;scatter-gather&#39;)&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_registered</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">] No quadrature space registered. &quot;</span>
+                <span class="s2">&quot;Call register_quadrature_space() first.&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;CouplingInterface&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Lavakumar Veludandi.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,406 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>fenicsx_cosim.mesh_extractor &mdash; FEniCSx CoSim nightly documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=028fc1c9"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            FEniCSx CoSim
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">fenicsx_cosim</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">FEniCSx CoSim</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">fenicsx_cosim.mesh_extractor</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for fenicsx_cosim.mesh_extractor</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">MeshExtractor — FEniCSx boundary data extraction engine.</span>
+
+<span class="sd">This module handles the highly specific FEniCSx v0.10+ API calls required</span>
+<span class="sd">to isolate boundary Degrees of Freedom (DoFs) and their spatial coordinates</span>
+<span class="sd">from a ``dolfinx.mesh.Mesh``.</span>
+
+<span class="sd">It corresponds to **Phase 1** of the development roadmap and is analogous</span>
+<span class="sd">to the ``CoSimIO::ModelPart`` concept in Kratos, but works natively with</span>
+<span class="sd">FEniCSx data structures.</span>
+
+<span class="sd">Typical usage</span>
+<span class="sd">-------------</span>
+<span class="sd">&gt;&gt;&gt; extractor = MeshExtractor()</span>
+<span class="sd">&gt;&gt;&gt; extractor.register(mesh, facet_tags, marker_id=1, function_space=V)</span>
+<span class="sd">&gt;&gt;&gt; coords = extractor.boundary_coordinates   # (N, 3) ndarray</span>
+<span class="sd">&gt;&gt;&gt; dof_indices = extractor.boundary_dof_indices  # (N,) ndarray</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># We import dolfinx lazily so the module can be imported for type-checking</span>
+<span class="c1"># even on machines without a full DOLFINx installation.</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dolfinx</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dolfinx.fem</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dolfinx.mesh</span>
+
+    <span class="n">_HAS_DOLFINX</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="n">_HAS_DOLFINX</span> <span class="o">=</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_require_dolfinx</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raise an informative error if DOLFINx is not installed.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_HAS_DOLFINX</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+            <span class="s2">&quot;DOLFINx is required for MeshExtractor but could not be imported. &quot;</span>
+            <span class="s2">&quot;Install it with: pip install fenics-dolfinx&quot;</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="BoundaryData">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.BoundaryData">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BoundaryData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Container for extracted boundary information.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dof_indices : np.ndarray</span>
+<span class="sd">        Global DoF indices that live on the coupling boundary.  Shape ``(N,)``.</span>
+<span class="sd">    coordinates : np.ndarray</span>
+<span class="sd">        Spatial coordinates of the boundary DoFs.  Shape ``(N, 3)``.</span>
+<span class="sd">    facet_indices : np.ndarray</span>
+<span class="sd">        Mesh facet indices that form the coupling boundary.</span>
+<span class="sd">    marker_id : int</span>
+<span class="sd">        The marker value used to identify the coupling boundary.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dof_indices</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">))</span>
+    <span class="n">coordinates</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">))</span>
+    <span class="n">facet_indices</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">))</span>
+    <span class="n">marker_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="MeshExtractor">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MeshExtractor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract boundary DoFs and coordinates from a FEniCSx mesh.</span>
+
+<span class="sd">    This class wraps the FEniCSx v0.10+ API to:</span>
+
+<span class="sd">    1. Identify boundary facets using mesh-tags or a locator function.</span>
+<span class="sd">    2. Find the DoFs living on those facets via topological DoF location.</span>
+<span class="sd">    3. Extract the ``(x, y, z)`` coordinates of the boundary DoFs.</span>
+
+<span class="sd">    The extracted data is stored internally and can be queried as NumPy</span>
+<span class="sd">    arrays for serialization and transmission via the ``Communicator``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_require_dolfinx</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_boundary_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">BoundaryData</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mesh</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;MeshExtractor created&quot;</span><span class="p">)</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Public API</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="MeshExtractor.register">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.register">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.Mesh&quot;</span><span class="p">,</span>
+        <span class="n">facet_tags</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.MeshTags&quot;</span><span class="p">,</span>
+        <span class="n">marker_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">function_space</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.FunctionSpace&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BoundaryData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a coupling boundary and extract its DoF information.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        mesh : dolfinx.mesh.Mesh</span>
+<span class="sd">            The computational mesh.</span>
+<span class="sd">        facet_tags : dolfinx.mesh.MeshTags</span>
+<span class="sd">            Mesh tags that label boundary facets.</span>
+<span class="sd">        marker_id : int</span>
+<span class="sd">            The integer marker identifying the coupling boundary within</span>
+<span class="sd">            *facet_tags*.</span>
+<span class="sd">        function_space : dolfinx.fem.FunctionSpace</span>
+<span class="sd">            The function space whose DoFs on the boundary are needed.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        BoundaryData</span>
+<span class="sd">            A dataclass holding the extracted boundary information.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mesh</span> <span class="o">=</span> <span class="n">mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="n">function_space</span>
+
+        <span class="c1"># 1. Find facet indices on the coupling boundary</span>
+        <span class="n">facet_indices</span> <span class="o">=</span> <span class="n">facet_tags</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">marker_id</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Found </span><span class="si">%d</span><span class="s2"> facets with marker_id=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">facet_indices</span><span class="p">),</span> <span class="n">marker_id</span>
+        <span class="p">)</span>
+
+        <span class="c1"># 2. Get the topological dimension (facets are dim - 1)</span>
+        <span class="n">tdim</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">dim</span>
+        <span class="n">fdim</span> <span class="o">=</span> <span class="n">tdim</span> <span class="o">-</span> <span class="mi">1</span>
+
+        <span class="c1"># Ensure connectivity is available</span>
+        <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">create_connectivity</span><span class="p">(</span><span class="n">fdim</span><span class="p">,</span> <span class="n">tdim</span><span class="p">)</span>
+
+        <span class="c1"># 3. Locate DoFs on the boundary facets</span>
+        <span class="n">dof_indices</span> <span class="o">=</span> <span class="n">dolfinx</span><span class="o">.</span><span class="n">fem</span><span class="o">.</span><span class="n">locate_dofs_topological</span><span class="p">(</span>
+            <span class="n">function_space</span><span class="p">,</span> <span class="n">fdim</span><span class="p">,</span> <span class="n">facet_indices</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Located </span><span class="si">%d</span><span class="s2"> boundary DoFs on marker_id=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">dof_indices</span><span class="p">),</span> <span class="n">marker_id</span>
+        <span class="p">)</span>
+
+        <span class="c1"># 4. Extract the (x, y, z) coordinates of these DoFs</span>
+        <span class="c1">#    In DOLFINx v0.10, dof coordinates come from the function space&#39;s</span>
+        <span class="c1">#    tabulate_dof_coordinates() method.</span>
+        <span class="n">dof_coords</span> <span class="o">=</span> <span class="n">function_space</span><span class="o">.</span><span class="n">tabulate_dof_coordinates</span><span class="p">()</span>
+        <span class="n">boundary_coords</span> <span class="o">=</span> <span class="n">dof_coords</span><span class="p">[</span><span class="n">dof_indices</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_boundary_data</span> <span class="o">=</span> <span class="n">BoundaryData</span><span class="p">(</span>
+            <span class="n">dof_indices</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dof_indices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+            <span class="n">coordinates</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">boundary_coords</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+            <span class="n">facet_indices</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">facet_indices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+            <span class="n">marker_id</span><span class="o">=</span><span class="n">marker_id</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_boundary_data</span></div>
+
+
+<div class="viewcode-block" id="MeshExtractor.register_from_locator">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.register_from_locator">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_from_locator</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.Mesh&quot;</span><span class="p">,</span>
+        <span class="n">locator_fn</span><span class="p">,</span>
+        <span class="n">function_space</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.FunctionSpace&quot;</span><span class="p">,</span>
+        <span class="n">marker_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BoundaryData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a coupling boundary using a geometric locator function.</span>
+
+<span class="sd">        This is a convenience method for cases where no ``MeshTags`` object</span>
+<span class="sd">        exists.  The *locator_fn* must accept an ``(3, N)`` array of</span>
+<span class="sd">        coordinates and return a boolean mask of length ``N``.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        mesh : dolfinx.mesh.Mesh</span>
+<span class="sd">            The computational mesh.</span>
+<span class="sd">        locator_fn : callable</span>
+<span class="sd">            ``locator_fn(x: ndarray) -&gt; ndarray[bool]`` — identifies</span>
+<span class="sd">            boundary facets.</span>
+<span class="sd">        function_space : dolfinx.fem.FunctionSpace</span>
+<span class="sd">            The function space whose DoFs on the boundary are needed.</span>
+<span class="sd">        marker_id : int, optional</span>
+<span class="sd">            A label for this boundary (default ``0``).</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        BoundaryData</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mesh</span> <span class="o">=</span> <span class="n">mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="n">function_space</span>
+
+        <span class="n">tdim</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">dim</span>
+        <span class="n">fdim</span> <span class="o">=</span> <span class="n">tdim</span> <span class="o">-</span> <span class="mi">1</span>
+
+        <span class="c1"># Find boundary facets using the locator</span>
+        <span class="n">facet_indices</span> <span class="o">=</span> <span class="n">dolfinx</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">locate_entities_boundary</span><span class="p">(</span>
+            <span class="n">mesh</span><span class="p">,</span> <span class="n">fdim</span><span class="p">,</span> <span class="n">locator_fn</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Locator found </span><span class="si">%d</span><span class="s2"> boundary facets&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">facet_indices</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">create_connectivity</span><span class="p">(</span><span class="n">fdim</span><span class="p">,</span> <span class="n">tdim</span><span class="p">)</span>
+
+        <span class="n">dof_indices</span> <span class="o">=</span> <span class="n">dolfinx</span><span class="o">.</span><span class="n">fem</span><span class="o">.</span><span class="n">locate_dofs_topological</span><span class="p">(</span>
+            <span class="n">function_space</span><span class="p">,</span> <span class="n">fdim</span><span class="p">,</span> <span class="n">facet_indices</span>
+        <span class="p">)</span>
+        <span class="n">dof_coords</span> <span class="o">=</span> <span class="n">function_space</span><span class="o">.</span><span class="n">tabulate_dof_coordinates</span><span class="p">()</span>
+        <span class="n">boundary_coords</span> <span class="o">=</span> <span class="n">dof_coords</span><span class="p">[</span><span class="n">dof_indices</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_boundary_data</span> <span class="o">=</span> <span class="n">BoundaryData</span><span class="p">(</span>
+            <span class="n">dof_indices</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dof_indices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+            <span class="n">coordinates</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">boundary_coords</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+            <span class="n">facet_indices</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">facet_indices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+            <span class="n">marker_id</span><span class="o">=</span><span class="n">marker_id</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_boundary_data</span></div>
+
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Accessors</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">boundary_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BoundaryData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The most recently extracted :class:`BoundaryData`.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_boundary_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;No boundary registered yet. Call register() first.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_boundary_data</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">boundary_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Spatial coordinates of boundary DoFs — shape ``(N, 3)``.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary_data</span><span class="o">.</span><span class="n">coordinates</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">boundary_dof_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Global DoF indices on the coupling boundary — shape ``(N,)``.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary_data</span><span class="o">.</span><span class="n">dof_indices</span>
+
+<div class="viewcode-block" id="MeshExtractor.extract_boundary_values">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.extract_boundary_values">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_boundary_values</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract the values of a FEniCSx Function at the boundary DoFs.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            The FEniCSx function whose boundary values are needed.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Values at the boundary DoFs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">bd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary_data</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="n">bd</span><span class="o">.</span><span class="n">dof_indices</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MeshExtractor.inject_boundary_values">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.inject_boundary_values">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inject_boundary_values</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">,</span>
+        <span class="n">values</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Inject values into a FEniCSx Function at the boundary DoFs.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            The target FEniCSx function.</span>
+<span class="sd">        values : np.ndarray</span>
+<span class="sd">            The values to inject (must match the number of boundary DoFs).</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If *values* length does not match the number of boundary DoFs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">bd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary_data</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bd</span><span class="o">.</span><span class="n">dof_indices</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Expected </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bd</span><span class="o">.</span><span class="n">dof_indices</span><span class="p">)</span><span class="si">}</span><span class="s2"> values, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="n">function</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="n">bd</span><span class="o">.</span><span class="n">dof_indices</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Lavakumar Veludandi.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,387 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>fenicsx_cosim &mdash; FEniCSx CoSim nightly documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=028fc1c9"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="fenicsx_cosim package" href="fenicsx_cosim.html" />
+    <link rel="prev" title="FEniCSx CoSim documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            FEniCSx CoSim
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">fenicsx_cosim</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html">fenicsx_cosim package</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">FEniCSx CoSim</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">fenicsx_cosim</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/modules.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="fenicsx-cosim">
+<h1>fenicsx_cosim<a class="headerlink" href="#fenicsx-cosim" title="Link to this heading"></a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="fenicsx_cosim.html">fenicsx_cosim package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#module-fenicsx_cosim.communicator">fenicsx_cosim.communicator module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#typical-usage">Typical usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.communicator.CommunicationError"><code class="docutils literal notranslate"><span class="pre">CommunicationError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.communicator.Communicator"><code class="docutils literal notranslate"><span class="pre">Communicator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.communicator.Communicator.close"><code class="docutils literal notranslate"><span class="pre">Communicator.close()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.communicator.Communicator.is_connected"><code class="docutils literal notranslate"><span class="pre">Communicator.is_connected</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.communicator.Communicator.receive_array"><code class="docutils literal notranslate"><span class="pre">Communicator.receive_array()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.communicator.Communicator.receive_raw"><code class="docutils literal notranslate"><span class="pre">Communicator.receive_raw()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.communicator.Communicator.send_array"><code class="docutils literal notranslate"><span class="pre">Communicator.send_array()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.communicator.Communicator.send_raw"><code class="docutils literal notranslate"><span class="pre">Communicator.send_raw()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.communicator.Communicator.synchronize"><code class="docutils literal notranslate"><span class="pre">Communicator.synchronize()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#module-fenicsx_cosim.coupling_interface">fenicsx_cosim.coupling_interface module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#typical-usage-standard-boundary-coupling">Typical usage (Standard Boundary Coupling)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#typical-usage-fe2-scatter-gather">Typical usage (FE² Scatter-Gather)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface"><code class="docutils literal notranslate"><span class="pre">CouplingInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.advance_in_time"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.advance_in_time()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.boundary_coordinates"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.boundary_coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.check_mesh_update"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.check_mesh_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.disconnect"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.disconnect()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.dynamic_mapper"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.dynamic_mapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.export_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.export_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.export_raw"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.export_raw()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.extractor"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.extractor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.gather_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.gather_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.import_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.import_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.import_raw"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.import_raw()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.mapper"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.mapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.partner_coordinates"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.partner_coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.quadrature_extractor"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.quadrature_extractor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.register_interface"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.register_interface()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.register_interface_from_locator"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.register_interface_from_locator()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.register_quadrature_space"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.register_quadrature_space()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.scatter_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.scatter_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.scatter_gather_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.scatter_gather_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.step_count"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.step_count</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.coupling_interface.CouplingInterface.update_interface_geometry"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.update_interface_geometry()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#module-fenicsx_cosim.data_mapper">fenicsx_cosim.data_mapper module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#id1">Typical usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.DataMapper"><code class="docutils literal notranslate"><span class="pre">DataMapper</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.DataMapper.build"><code class="docutils literal notranslate"><span class="pre">DataMapper.build()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.DataMapper.inverse_map"><code class="docutils literal notranslate"><span class="pre">DataMapper.inverse_map()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.DataMapper.map"><code class="docutils literal notranslate"><span class="pre">DataMapper.map()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.NearestNeighborMapper"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.NearestNeighborMapper.max_distance"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.max_distance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.NearestNeighborMapper.build"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.build()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.NearestNeighborMapper.forward_distances"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.forward_distances</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.NearestNeighborMapper.inverse_map"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.inverse_map()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.data_mapper.NearestNeighborMapper.map"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.map()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#module-fenicsx_cosim.dynamic_mapper">fenicsx_cosim.dynamic_mapper module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#typical-usage-inside-a-time-loop">Typical usage (inside a time loop)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper"><code class="docutils literal notranslate"><span class="pre">DynamicMapper</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.revision"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.revision</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.max_distance"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.max_distance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.build"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.build()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.invalidate"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.invalidate()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.inverse_map"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.inverse_map()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.local_coordinates"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.local_coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.map"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.map()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id0"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.max_distance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.needs_update"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.needs_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.negotiate_update"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.negotiate_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.partner_coordinates"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.partner_coordinates</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#module-fenicsx_cosim.mesh_extractor">fenicsx_cosim.mesh_extractor module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#id2">Typical usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.BoundaryData"><code class="docutils literal notranslate"><span class="pre">BoundaryData</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.BoundaryData.dof_indices"><code class="docutils literal notranslate"><span class="pre">BoundaryData.dof_indices</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.BoundaryData.coordinates"><code class="docutils literal notranslate"><span class="pre">BoundaryData.coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.BoundaryData.facet_indices"><code class="docutils literal notranslate"><span class="pre">BoundaryData.facet_indices</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.BoundaryData.marker_id"><code class="docutils literal notranslate"><span class="pre">BoundaryData.marker_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id3"><code class="docutils literal notranslate"><span class="pre">BoundaryData.coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id4"><code class="docutils literal notranslate"><span class="pre">BoundaryData.dof_indices</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id5"><code class="docutils literal notranslate"><span class="pre">BoundaryData.facet_indices</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id6"><code class="docutils literal notranslate"><span class="pre">BoundaryData.marker_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor"><code class="docutils literal notranslate"><span class="pre">MeshExtractor</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.boundary_coordinates"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.boundary_coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.boundary_data"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.boundary_data</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.boundary_dof_indices"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.boundary_dof_indices</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.extract_boundary_values"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.extract_boundary_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.inject_boundary_values"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.inject_boundary_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.register"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.register()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.mesh_extractor.MeshExtractor.register_from_locator"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.register_from_locator()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#module-fenicsx_cosim.quadrature_extractor">fenicsx_cosim.quadrature_extractor module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#id7">Typical usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureData"><code class="docutils literal notranslate"><span class="pre">QuadratureData</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureData.num_cells"><code class="docutils literal notranslate"><span class="pre">QuadratureData.num_cells</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureData.points_per_cell"><code class="docutils literal notranslate"><span class="pre">QuadratureData.points_per_cell</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureData.total_points"><code class="docutils literal notranslate"><span class="pre">QuadratureData.total_points</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureData.tensor_shape"><code class="docutils literal notranslate"><span class="pre">QuadratureData.tensor_shape</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureData.dof_per_value"><code class="docutils literal notranslate"><span class="pre">QuadratureData.dof_per_value</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureData.coordinates"><code class="docutils literal notranslate"><span class="pre">QuadratureData.coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id8"><code class="docutils literal notranslate"><span class="pre">QuadratureData.coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id9"><code class="docutils literal notranslate"><span class="pre">QuadratureData.dof_per_value</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id10"><code class="docutils literal notranslate"><span class="pre">QuadratureData.num_cells</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id11"><code class="docutils literal notranslate"><span class="pre">QuadratureData.points_per_cell</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id12"><code class="docutils literal notranslate"><span class="pre">QuadratureData.tensor_shape</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id13"><code class="docutils literal notranslate"><span class="pre">QuadratureData.total_points</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.cell_to_dof_map"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.cell_to_dof_map</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.extract_cell_values"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.extract_cell_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.extract_for_dispatch"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.extract_for_dispatch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.extract_values"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.extract_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.function_space"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.function_space</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.inject_cell_values"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.inject_cell_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.inject_from_gather"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.inject_from_gather()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.inject_values"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.inject_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.quadrature_data"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.quadrature_data</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.register"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.register()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.register_with_function_space"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.register_with_function_space()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#module-fenicsx_cosim.scatter_gather_communicator">fenicsx_cosim.scatter_gather_communicator module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#typical-usage-master">Typical usage (Master)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#typical-usage-worker">Typical usage (Worker)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator.broadcast_shutdown"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.broadcast_shutdown()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator.close"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.close()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator.gather"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.gather()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator.is_connected"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.is_connected</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator.pull_work"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.pull_work()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator.push_result"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.push_result()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator.scatter"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.scatter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator.scatter_gather"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.scatter_gather()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.scatter_gather_communicator.ScatterGatherCommunicator.work_loop"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.work_loop()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#module-fenicsx_cosim.utils">fenicsx_cosim.utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.utils.deserialize_array"><code class="docutils literal notranslate"><span class="pre">deserialize_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.utils.get_logger"><code class="docutils literal notranslate"><span class="pre">get_logger()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.utils.make_handshake_msg"><code class="docutils literal notranslate"><span class="pre">make_handshake_msg()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.utils.parse_handshake_msg"><code class="docutils literal notranslate"><span class="pre">parse_handshake_msg()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.utils.serialize_array"><code class="docutils literal notranslate"><span class="pre">serialize_array()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html#module-fenicsx_cosim">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#core-modules">Core modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#example-standard-boundary-coupling">Example (Standard Boundary Coupling)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#example-fe2-scatter-gather">Example (FE² Scatter-Gather)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.Communicator"><code class="docutils literal notranslate"><span class="pre">Communicator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.Communicator.close"><code class="docutils literal notranslate"><span class="pre">Communicator.close()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.Communicator.is_connected"><code class="docutils literal notranslate"><span class="pre">Communicator.is_connected</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.Communicator.receive_array"><code class="docutils literal notranslate"><span class="pre">Communicator.receive_array()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.Communicator.receive_raw"><code class="docutils literal notranslate"><span class="pre">Communicator.receive_raw()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.Communicator.send_array"><code class="docutils literal notranslate"><span class="pre">Communicator.send_array()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.Communicator.send_raw"><code class="docutils literal notranslate"><span class="pre">Communicator.send_raw()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.Communicator.synchronize"><code class="docutils literal notranslate"><span class="pre">Communicator.synchronize()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface"><code class="docutils literal notranslate"><span class="pre">CouplingInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.advance_in_time"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.advance_in_time()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.boundary_coordinates"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.boundary_coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.check_mesh_update"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.check_mesh_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.disconnect"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.disconnect()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.dynamic_mapper"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.dynamic_mapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.export_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.export_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.export_raw"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.export_raw()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.extractor"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.extractor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.gather_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.gather_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.import_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.import_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.import_raw"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.import_raw()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.mapper"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.mapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.partner_coordinates"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.partner_coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.quadrature_extractor"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.quadrature_extractor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.register_interface"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.register_interface()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.register_interface_from_locator"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.register_interface_from_locator()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.register_quadrature_space"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.register_quadrature_space()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.scatter_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.scatter_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.scatter_gather_data"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.scatter_gather_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.step_count"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.step_count</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.CouplingInterface.update_interface_geometry"><code class="docutils literal notranslate"><span class="pre">CouplingInterface.update_interface_geometry()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DataMapper"><code class="docutils literal notranslate"><span class="pre">DataMapper</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DataMapper.build"><code class="docutils literal notranslate"><span class="pre">DataMapper.build()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DataMapper.inverse_map"><code class="docutils literal notranslate"><span class="pre">DataMapper.inverse_map()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DataMapper.map"><code class="docutils literal notranslate"><span class="pre">DataMapper.map()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper"><code class="docutils literal notranslate"><span class="pre">DynamicMapper</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.revision"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.revision</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.max_distance"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.max_distance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.build"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.build()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.invalidate"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.invalidate()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.inverse_map"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.inverse_map()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.local_coordinates"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.local_coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.map"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.map()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#id14"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.max_distance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.needs_update"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.needs_update</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.negotiate_update"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.negotiate_update()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.DynamicMapper.partner_coordinates"><code class="docutils literal notranslate"><span class="pre">DynamicMapper.partner_coordinates</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.MeshExtractor"><code class="docutils literal notranslate"><span class="pre">MeshExtractor</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.MeshExtractor.boundary_coordinates"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.boundary_coordinates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.MeshExtractor.boundary_data"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.boundary_data</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.MeshExtractor.boundary_dof_indices"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.boundary_dof_indices</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.MeshExtractor.extract_boundary_values"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.extract_boundary_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.MeshExtractor.inject_boundary_values"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.inject_boundary_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.MeshExtractor.register"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.register()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.MeshExtractor.register_from_locator"><code class="docutils literal notranslate"><span class="pre">MeshExtractor.register_from_locator()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.NearestNeighborMapper"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.NearestNeighborMapper.max_distance"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.max_distance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.NearestNeighborMapper.build"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.build()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.NearestNeighborMapper.forward_distances"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.forward_distances</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.NearestNeighborMapper.inverse_map"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.inverse_map()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.NearestNeighborMapper.map"><code class="docutils literal notranslate"><span class="pre">NearestNeighborMapper.map()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.cell_to_dof_map"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.cell_to_dof_map</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.extract_cell_values"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.extract_cell_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.extract_for_dispatch"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.extract_for_dispatch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.extract_values"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.extract_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.function_space"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.function_space</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.inject_cell_values"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.inject_cell_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.inject_from_gather"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.inject_from_gather()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.inject_values"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.inject_values()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.quadrature_data"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.quadrature_data</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.register"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.register()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.QuadratureExtractor.register_with_function_space"><code class="docutils literal notranslate"><span class="pre">QuadratureExtractor.register_with_function_space()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator.broadcast_shutdown"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.broadcast_shutdown()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator.close"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.close()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator.gather"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.gather()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator.is_connected"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.is_connected</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator.pull_work"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.pull_work()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator.push_result"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.push_result()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator.scatter"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.scatter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator.scatter_gather"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.scatter_gather()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="fenicsx_cosim.html#fenicsx_cosim.ScatterGatherCommunicator.work_loop"><code class="docutils literal notranslate"><span class="pre">ScatterGatherCommunicator.work_loop()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="FEniCSx CoSim documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="fenicsx_cosim.html" class="btn btn-neutral float-right" title="fenicsx_cosim package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Lavakumar Veludandi.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,389 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>fenicsx_cosim.dynamic_mapper &mdash; FEniCSx CoSim nightly documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=028fc1c9"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            FEniCSx CoSim
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">fenicsx_cosim</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">FEniCSx CoSim</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">fenicsx_cosim.dynamic_mapper</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for fenicsx_cosim.dynamic_mapper</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">DynamicMapper — Adaptive mesh-aware data mapping for AMR &amp; Shakedown.</span>
+
+<span class="sd">Standard co-simulation assumes a *static* coupling interface: the boundary</span>
+<span class="sd">coordinates are exchanged once during ``register_interface()`` and never</span>
+<span class="sd">change.  When Adaptive Mesh Refinement (AMR) is used</span>
+<span class="sd">(``dolfinx.mesh.refine``), the DoF coordinates change, rendering the</span>
+<span class="sd">previous ``scipy.spatial.KDTree`` and its mapping indices invalid.</span>
+
+<span class="sd">The ``DynamicMapper`` solves this by:</span>
+
+<span class="sd">1. **Detecting** that the underlying mesh has changed (via a revision</span>
+<span class="sd">   counter or explicit user call).</span>
+<span class="sd">2. **Broadcasting** an ``UPDATE_MESH`` signal over ZeroMQ to the partner</span>
+<span class="sd">   solver so *both* processes pause, exchange their newly-refined boundary</span>
+<span class="sd">   point clouds, and rebuild the interpolation mapping.</span>
+<span class="sd">3. **Rebuilding** the KDTree and mapping indices atomically, ensuring</span>
+<span class="sd">   the next ``export_data`` / ``import_data`` call uses the updated geometry.</span>
+
+<span class="sd">This corresponds to Section 1.1 of the Advanced Features Addendum in the</span>
+<span class="sd">project specification.</span>
+
+<span class="sd">Typical usage (inside a time loop)</span>
+<span class="sd">-----------------------------------</span>
+<span class="sd">&gt;&gt;&gt; if error_too_high:</span>
+<span class="sd">...     domain = dolfinx.mesh.refine(domain, markers)</span>
+<span class="sd">...     cosim.update_interface_geometry(domain, facet_tags, marker_id=1)</span>
+<span class="sd">&gt;&gt;&gt; cosim.export_data(&quot;Temperature&quot;, temperature)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.data_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataMapper</span><span class="p">,</span> <span class="n">NearestNeighborMapper</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Protocol signals for mesh-update negotiation</span>
+<span class="n">UPDATE_MESH_SIGNAL</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;COSIM_UPDATE_MESH&quot;</span>
+<span class="n">UPDATE_MESH_ACK</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;COSIM_UPDATE_MESH_ACK&quot;</span>
+<span class="n">NO_UPDATE_SIGNAL</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;COSIM_NO_UPDATE&quot;</span>
+
+
+<div class="viewcode-block" id="DynamicMapper">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DynamicMapper</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Mesh-change–aware wrapper around :class:`DataMapper`.</span>
+
+<span class="sd">    The ``DynamicMapper`` keeps track of a *revision counter* which is</span>
+<span class="sd">    bumped every time the mesh changes.  It provides helpers to negotiate</span>
+<span class="sd">    a synchronized re-mapping with the partner solver.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    base_mapper_cls : type[DataMapper], optional</span>
+<span class="sd">        The concrete mapper to use.  Defaults to</span>
+<span class="sd">        :class:`NearestNeighborMapper`.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    revision : int</span>
+<span class="sd">        The number of times the mapping has been (re-)built.</span>
+<span class="sd">    max_distance : float or None</span>
+<span class="sd">        Delegates to the underlying ``DataMapper.max_distance``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">base_mapper_cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">DataMapper</span><span class="p">]</span> <span class="o">=</span> <span class="n">NearestNeighborMapper</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mapper_cls</span> <span class="o">=</span> <span class="n">base_mapper_cls</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataMapper</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_local_coords</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_partner_coords</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">revision</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_needs_update</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Building / rebuilding</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="DynamicMapper.build">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.build">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">source_coords</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">target_coords</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build (or rebuild) the underlying mapping.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        source_coords : np.ndarray</span>
+<span class="sd">            Partner (source) boundary coordinates — shape ``(N_src, 3)``.</span>
+<span class="sd">        target_coords : np.ndarray</span>
+<span class="sd">            Local (target) boundary coordinates — shape ``(N_tgt, 3)``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_partner_coords</span> <span class="o">=</span> <span class="n">source_coords</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_local_coords</span> <span class="o">=</span> <span class="n">target_coords</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapper_cls</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">source_coords</span><span class="p">,</span> <span class="n">target_coords</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">revision</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_needs_update</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;DynamicMapper built (revision </span><span class="si">%d</span><span class="s2">) — </span><span class="si">%d</span><span class="s2"> src, </span><span class="si">%d</span><span class="s2"> tgt pts&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">revision</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">source_coords</span><span class="p">),</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">target_coords</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DynamicMapper.invalidate">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.invalidate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">invalidate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mark the current mapping as stale.</span>
+
+<span class="sd">        This should be called whenever the *local* mesh has been refined</span>
+<span class="sd">        or changed.  The mapping will not be usable until :meth:`build`</span>
+<span class="sd">        is called again.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_needs_update</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;DynamicMapper invalidated (was revision </span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">revision</span>
+        <span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">needs_update</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;``True`` if the mapping has been invalidated and must be rebuilt.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_needs_update</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Negotiation helpers</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="DynamicMapper.negotiate_update">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.negotiate_update">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">negotiate_update</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">communicator</span><span class="p">,</span>
+        <span class="n">role</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">my_new_coords</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Negotiate a mesh-update with the partner solver.</span>
+
+<span class="sd">        Both solvers must call this method at the same point in the time</span>
+<span class="sd">        loop.  The protocol:</span>
+
+<span class="sd">        1. The ``bind`` side sends either ``UPDATE_MESH_SIGNAL`` or</span>
+<span class="sd">           ``NO_UPDATE_SIGNAL``.</span>
+<span class="sd">        2. The ``connect`` side receives the signal and then sends its</span>
+<span class="sd">           own signal (likewise ``UPDATE_MESH_SIGNAL`` or</span>
+<span class="sd">           ``NO_UPDATE_SIGNAL``).</span>
+<span class="sd">        3. If *either* side signals an update, both exchange new</span>
+<span class="sd">           boundary coordinates and return the partner&#39;s new coordinates.</span>
+<span class="sd">           Otherwise ``None`` is returned and the mapping is untouched.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        communicator : Communicator</span>
+<span class="sd">            The ZeroMQ communicator already connected to the partner.</span>
+<span class="sd">        role : str</span>
+<span class="sd">            ``&quot;bind&quot;`` or ``&quot;connect&quot;``.</span>
+<span class="sd">        my_new_coords : np.ndarray or None</span>
+<span class="sd">            The new local boundary coordinates if the mesh changed, or</span>
+<span class="sd">            ``None`` if no change occurred.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray or None</span>
+<span class="sd">            The partner&#39;s new boundary coordinates if an exchange took</span>
+<span class="sd">            place, or ``None`` if no update was needed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">my_signal</span> <span class="o">=</span> <span class="n">UPDATE_MESH_SIGNAL</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_needs_update</span> <span class="k">else</span> <span class="n">NO_UPDATE_SIGNAL</span>
+
+        <span class="k">if</span> <span class="n">role</span> <span class="o">==</span> <span class="s2">&quot;bind&quot;</span><span class="p">:</span>
+            <span class="n">communicator</span><span class="o">.</span><span class="n">send_raw</span><span class="p">(</span><span class="n">my_signal</span><span class="p">)</span>
+            <span class="n">partner_signal</span> <span class="o">=</span> <span class="n">communicator</span><span class="o">.</span><span class="n">receive_raw</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">partner_signal</span> <span class="o">=</span> <span class="n">communicator</span><span class="o">.</span><span class="n">receive_raw</span><span class="p">()</span>
+            <span class="n">communicator</span><span class="o">.</span><span class="n">send_raw</span><span class="p">(</span><span class="n">my_signal</span><span class="p">)</span>
+
+        <span class="n">either_needs_update</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">my_signal</span> <span class="o">==</span> <span class="n">UPDATE_MESH_SIGNAL</span>
+            <span class="ow">or</span> <span class="n">partner_signal</span> <span class="o">==</span> <span class="n">UPDATE_MESH_SIGNAL</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">either_needs_update</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;DynamicMapper: no update needed on either side&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;DynamicMapper: mesh update detected (local=</span><span class="si">%s</span><span class="s2">, partner=</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+            <span class="n">my_signal</span> <span class="o">==</span> <span class="n">UPDATE_MESH_SIGNAL</span><span class="p">,</span>
+            <span class="n">partner_signal</span> <span class="o">==</span> <span class="n">UPDATE_MESH_SIGNAL</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Exchange new coordinates</span>
+        <span class="k">if</span> <span class="n">my_new_coords</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Our mesh didn&#39;t change — re-send old coords</span>
+            <span class="n">my_new_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_local_coords</span>
+
+        <span class="k">if</span> <span class="n">role</span> <span class="o">==</span> <span class="s2">&quot;bind&quot;</span><span class="p">:</span>
+            <span class="n">communicator</span><span class="o">.</span><span class="n">send_array</span><span class="p">(</span><span class="s2">&quot;updated_boundary_coords&quot;</span><span class="p">,</span> <span class="n">my_new_coords</span><span class="p">)</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">partner_coords</span> <span class="o">=</span> <span class="n">communicator</span><span class="o">.</span><span class="n">receive_array</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">partner_coords</span> <span class="o">=</span> <span class="n">communicator</span><span class="o">.</span><span class="n">receive_array</span><span class="p">()</span>
+            <span class="n">communicator</span><span class="o">.</span><span class="n">send_array</span><span class="p">(</span><span class="s2">&quot;updated_boundary_coords&quot;</span><span class="p">,</span> <span class="n">my_new_coords</span><span class="p">)</span>
+
+        <span class="c1"># Acknowledge</span>
+        <span class="k">if</span> <span class="n">role</span> <span class="o">==</span> <span class="s2">&quot;bind&quot;</span><span class="p">:</span>
+            <span class="n">communicator</span><span class="o">.</span><span class="n">send_raw</span><span class="p">(</span><span class="n">UPDATE_MESH_ACK</span><span class="p">)</span>
+            <span class="n">ack</span> <span class="o">=</span> <span class="n">communicator</span><span class="o">.</span><span class="n">receive_raw</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ack</span> <span class="o">=</span> <span class="n">communicator</span><span class="o">.</span><span class="n">receive_raw</span><span class="p">()</span>
+            <span class="n">communicator</span><span class="o">.</span><span class="n">send_raw</span><span class="p">(</span><span class="n">UPDATE_MESH_ACK</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">ack</span> <span class="o">!=</span> <span class="n">UPDATE_MESH_ACK</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Unexpected ACK during mesh update: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">ack</span><span class="p">)</span>
+
+        <span class="c1"># Rebuild the mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+            <span class="n">source_coords</span><span class="o">=</span><span class="n">partner_coords</span><span class="p">,</span>
+            <span class="n">target_coords</span><span class="o">=</span><span class="n">my_new_coords</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">partner_coords</span></div>
+
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Delegation to the underlying mapper</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="DynamicMapper.map">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.map">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source_values</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Map values from partner (source) to local (target) DoFs.</span>
+
+<span class="sd">        Raises :class:`RuntimeError` if the mapping is stale.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_valid</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">source_values</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DynamicMapper.inverse_map">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.dynamic_mapper.DynamicMapper.inverse_map">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inverse_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_values</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Map values from local (target) back to partner (source) DoFs.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_valid</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="o">.</span><span class="n">inverse_map</span><span class="p">(</span><span class="n">target_values</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">max_distance</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Maximum mapping distance from the underlying mapper.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span><span class="p">,</span> <span class="s2">&quot;max_distance&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">local_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The local boundary coordinates used in the latest mapping.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_local_coords</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">partner_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The partner boundary coordinates used in the latest mapping.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partner_coords</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Internal</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_valid</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapper</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;DynamicMapper not built. Call build() first.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_needs_update</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;DynamicMapper mapping is stale — the mesh has changed. &quot;</span>
+                <span class="s2">&quot;Call negotiate_update() or build() to refresh.&quot;</span>
+            <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Lavakumar Veludandi.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,666 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>fenicsx_cosim.quadrature_extractor &mdash; FEniCSx CoSim nightly documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=028fc1c9"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            FEniCSx CoSim
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">fenicsx_cosim</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">FEniCSx CoSim</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">fenicsx_cosim.quadrature_extractor</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for fenicsx_cosim.quadrature_extractor</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">QuadratureExtractor — Integration-point data extraction for FE² homogenization.</span>
+
+<span class="sd">In multiscale FE² homogenization, data is **not** exchanged at the mesh</span>
+<span class="sd">boundaries but at the *integration (Gauss) points* of every element.  The</span>
+<span class="sd">macroscopic solver computes a strain tensor at each integration point and</span>
+<span class="sd">dispatches it to a Representative Volume Element (RVE) solver.  The RVE</span>
+<span class="sd">solver returns the homogenized stress tensor and tangent stiffness.</span>
+
+<span class="sd">The ``QuadratureExtractor`` provides the FEniCSx v0.10+ API calls to:</span>
+
+<span class="sd">1. Create and manage Quadrature function spaces::</span>
+
+<span class="sd">       V_quad = dolfinx.fem.functionspace(mesh, (&quot;Quadrature&quot;, degree, shape))</span>
+
+<span class="sd">2. Extract tensor values (e.g. macroscopic strain) from Quadrature functions.</span>
+<span class="sd">3. Inject tensor values (e.g. homogenized stress) back in, with correct</span>
+<span class="sd">   element → global DoF mapping.</span>
+
+<span class="sd">This corresponds to Section 1.2 of the Advanced Features Addendum.</span>
+
+<span class="sd">Typical usage</span>
+<span class="sd">-------------</span>
+<span class="sd">&gt;&gt;&gt; extractor = QuadratureExtractor()</span>
+<span class="sd">&gt;&gt;&gt; extractor.register(mesh, quadrature_degree=2, tensor_shape=(3, 3))</span>
+<span class="sd">&gt;&gt;&gt; strains = extractor.extract_values(macro_strain_function)</span>
+<span class="sd">&gt;&gt;&gt; extractor.inject_values(stress_function, homogenized_stresses)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">fenicsx_cosim.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Lazy DOLFINx import</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">basix</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dolfinx</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dolfinx.fem</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dolfinx.mesh</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ufl</span>
+
+    <span class="n">_HAS_DOLFINX</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="n">_HAS_DOLFINX</span> <span class="o">=</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_require_dolfinx</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raise an informative error if DOLFINx is not installed.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_HAS_DOLFINX</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+            <span class="s2">&quot;DOLFINx is required for QuadratureExtractor but could not be &quot;</span>
+            <span class="s2">&quot;imported.  Install it with: pip install fenics-dolfinx&quot;</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="QuadratureData">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureData">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">QuadratureData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Container for quadrature-point information.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    num_cells : int</span>
+<span class="sd">        Number of mesh cells (elements).</span>
+<span class="sd">    points_per_cell : int</span>
+<span class="sd">        Number of quadrature/integration points per cell.</span>
+<span class="sd">    total_points : int</span>
+<span class="sd">        ``num_cells * points_per_cell``.</span>
+<span class="sd">    tensor_shape : tuple[int, ...]</span>
+<span class="sd">        Shape of each tensor at each integration point (e.g. ``(3, 3)``</span>
+<span class="sd">        for a 2D symmetric stress/strain tensor, or ``(6,)`` for Voigt).</span>
+<span class="sd">    dof_per_value : int</span>
+<span class="sd">        Number of scalar DoFs per integration point (product of</span>
+<span class="sd">        ``tensor_shape``).</span>
+<span class="sd">    coordinates : np.ndarray</span>
+<span class="sd">        Physical coordinates of all integration points —</span>
+<span class="sd">        shape ``(total_points, gdim)``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">num_cells</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">points_per_cell</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">total_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">tensor_shape</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">dof_per_value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">coordinates</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="QuadratureExtractor">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QuadratureExtractor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract and inject tensor data at integration points.</span>
+
+<span class="sd">    This class works with FEniCSx Quadrature function spaces to handle</span>
+<span class="sd">    the data exchange required for FE² (computational homogenization).</span>
+
+<span class="sd">    The user creates a ``QuadratureExtractor``, registers it with a mesh</span>
+<span class="sd">    and quadrature degree, and then uses it to extract/inject tensors</span>
+<span class="sd">    that are stored as ``dolfinx.fem.Function`` objects on the Quadrature</span>
+<span class="sd">    space.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_require_dolfinx</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">QuadratureData</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mesh</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quadrature_degree</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tensor_shape</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cell_to_dof_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;QuadratureExtractor created&quot;</span><span class="p">)</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Public API</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="QuadratureExtractor.register">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.register">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.Mesh&quot;</span><span class="p">,</span>
+        <span class="n">quadrature_degree</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="n">tensor_shape</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuadratureData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a mesh and create a Quadrature function space.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        mesh : dolfinx.mesh.Mesh</span>
+<span class="sd">            The computational mesh (typically the macro-mesh in FE²).</span>
+<span class="sd">        quadrature_degree : int, optional</span>
+<span class="sd">            The polynomial degree for the quadrature rule.  Default = 2.</span>
+<span class="sd">        tensor_shape : tuple[int, ...] or int, optional</span>
+<span class="sd">            Shape of the tensor at each integration point.  Examples:</span>
+
+<span class="sd">            * ``()`` or ``1`` — scalar field.</span>
+<span class="sd">            * ``(3,)`` — vector in 2D (Voigt stress/strain).</span>
+<span class="sd">            * ``(6,)`` — symmetric tensor in 3D (Voigt notation).</span>
+<span class="sd">            * ``(3, 3)`` — full 2D tensor.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        QuadratureData</span>
+<span class="sd">            Metadata about the quadrature points.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mesh</span> <span class="o">=</span> <span class="n">mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quadrature_degree</span> <span class="o">=</span> <span class="n">quadrature_degree</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor_shape</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">tensor_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">tensor_shape</span><span class="p">,)</span> <span class="k">if</span> <span class="n">tensor_shape</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tensor_shape</span> <span class="o">=</span> <span class="n">tensor_shape</span>
+
+        <span class="c1"># Determine the number of scalar DoFs per integration point</span>
+        <span class="n">dof_per_value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">tensor_shape</span><span class="p">))</span> <span class="k">if</span> <span class="n">tensor_shape</span> <span class="k">else</span> <span class="mi">1</span>
+
+        <span class="c1"># Create the Quadrature function space</span>
+        <span class="c1"># In FEniCSx v0.10+ the Quadrature element is created via basix</span>
+        <span class="n">tdim</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">dim</span>
+        <span class="n">gdim</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">dim</span>
+
+        <span class="c1"># Create the Quadrature element</span>
+        <span class="n">cell_type</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">cell_type</span>
+        <span class="n">basix_cell</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">basix</span><span class="o">.</span><span class="n">CellType</span><span class="p">,</span> <span class="n">cell_type</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="n">q_element</span> <span class="o">=</span> <span class="n">basix</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">quadrature_element</span><span class="p">(</span>
+            <span class="n">basix_cell</span><span class="p">,</span>
+            <span class="n">value_shape</span><span class="o">=</span><span class="n">tensor_shape</span><span class="p">,</span>
+            <span class="n">degree</span><span class="o">=</span><span class="n">quadrature_degree</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="n">dolfinx</span><span class="o">.</span><span class="n">fem</span><span class="o">.</span><span class="n">functionspace</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">q_element</span><span class="p">)</span>
+
+        <span class="c1"># Get the number of cells</span>
+        <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">create_entities</span><span class="p">(</span><span class="n">tdim</span><span class="p">)</span>
+        <span class="n">num_cells</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">index_map</span><span class="p">(</span><span class="n">tdim</span><span class="p">)</span><span class="o">.</span><span class="n">size_local</span>
+
+        <span class="c1"># Determine quadrature points per cell from the function space</span>
+        <span class="n">dofmap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span><span class="o">.</span><span class="n">dofmap</span>
+        <span class="n">points_per_cell</span> <span class="o">=</span> <span class="n">dofmap</span><span class="o">.</span><span class="n">dof_layout</span><span class="o">.</span><span class="n">num_dofs</span>
+
+        <span class="n">total_points</span> <span class="o">=</span> <span class="n">num_cells</span> <span class="o">*</span> <span class="n">points_per_cell</span>
+
+        <span class="c1"># Compute physical coordinates of all integration points</span>
+        <span class="n">quad_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_quadrature_coordinates</span><span class="p">(</span>
+            <span class="n">mesh</span><span class="p">,</span> <span class="n">quadrature_degree</span><span class="p">,</span> <span class="n">num_cells</span><span class="p">,</span> <span class="n">points_per_cell</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Build cell → global DoF mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_build_cell_to_dof_map</span><span class="p">(</span><span class="n">num_cells</span><span class="p">,</span> <span class="n">dof_per_value</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span> <span class="o">=</span> <span class="n">QuadratureData</span><span class="p">(</span>
+            <span class="n">num_cells</span><span class="o">=</span><span class="n">num_cells</span><span class="p">,</span>
+            <span class="n">points_per_cell</span><span class="o">=</span><span class="n">points_per_cell</span><span class="p">,</span>
+            <span class="n">total_points</span><span class="o">=</span><span class="n">total_points</span><span class="p">,</span>
+            <span class="n">tensor_shape</span><span class="o">=</span><span class="n">tensor_shape</span><span class="p">,</span>
+            <span class="n">dof_per_value</span><span class="o">=</span><span class="n">dof_per_value</span><span class="p">,</span>
+            <span class="n">coordinates</span><span class="o">=</span><span class="n">quad_coords</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;QuadratureExtractor registered — </span><span class="si">%d</span><span class="s2"> cells × </span><span class="si">%d</span><span class="s2"> pts/cell = &quot;</span>
+            <span class="s2">&quot;</span><span class="si">%d</span><span class="s2"> integration points, tensor_shape=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">num_cells</span><span class="p">,</span>
+            <span class="n">points_per_cell</span><span class="p">,</span>
+            <span class="n">total_points</span><span class="p">,</span>
+            <span class="n">tensor_shape</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span></div>
+
+
+<div class="viewcode-block" id="QuadratureExtractor.register_with_function_space">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.register_with_function_space">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_with_function_space</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">function_space</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.FunctionSpace&quot;</span><span class="p">,</span>
+        <span class="n">tensor_shape</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuadratureData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register using a pre-existing Quadrature function space.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function_space : dolfinx.fem.FunctionSpace</span>
+<span class="sd">            An existing Quadrature function space.</span>
+<span class="sd">        tensor_shape : tuple[int, ...] or int, optional</span>
+<span class="sd">            Shape of the tensor at each integration point.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        QuadratureData</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span> <span class="o">=</span> <span class="n">function_space</span>
+        <span class="n">mesh</span> <span class="o">=</span> <span class="n">function_space</span><span class="o">.</span><span class="n">mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mesh</span> <span class="o">=</span> <span class="n">mesh</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor_shape</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">tensor_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">tensor_shape</span><span class="p">,)</span> <span class="k">if</span> <span class="n">tensor_shape</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tensor_shape</span> <span class="o">=</span> <span class="n">tensor_shape</span>
+
+        <span class="n">dof_per_value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">tensor_shape</span><span class="p">))</span> <span class="k">if</span> <span class="n">tensor_shape</span> <span class="k">else</span> <span class="mi">1</span>
+
+        <span class="n">tdim</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">dim</span>
+        <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">create_entities</span><span class="p">(</span><span class="n">tdim</span><span class="p">)</span>
+        <span class="n">num_cells</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">index_map</span><span class="p">(</span><span class="n">tdim</span><span class="p">)</span><span class="o">.</span><span class="n">size_local</span>
+
+        <span class="n">dofmap</span> <span class="o">=</span> <span class="n">function_space</span><span class="o">.</span><span class="n">dofmap</span>
+        <span class="n">points_per_cell</span> <span class="o">=</span> <span class="n">dofmap</span><span class="o">.</span><span class="n">dof_layout</span><span class="o">.</span><span class="n">num_dofs</span>
+
+        <span class="n">total_points</span> <span class="o">=</span> <span class="n">num_cells</span> <span class="o">*</span> <span class="n">points_per_cell</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_build_cell_to_dof_map</span><span class="p">(</span><span class="n">num_cells</span><span class="p">,</span> <span class="n">dof_per_value</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span> <span class="o">=</span> <span class="n">QuadratureData</span><span class="p">(</span>
+            <span class="n">num_cells</span><span class="o">=</span><span class="n">num_cells</span><span class="p">,</span>
+            <span class="n">points_per_cell</span><span class="o">=</span><span class="n">points_per_cell</span><span class="p">,</span>
+            <span class="n">total_points</span><span class="o">=</span><span class="n">total_points</span><span class="p">,</span>
+            <span class="n">tensor_shape</span><span class="o">=</span><span class="n">tensor_shape</span><span class="p">,</span>
+            <span class="n">dof_per_value</span><span class="o">=</span><span class="n">dof_per_value</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;QuadratureExtractor registered (from function space) — &quot;</span>
+            <span class="s2">&quot;</span><span class="si">%d</span><span class="s2"> cells × </span><span class="si">%d</span><span class="s2"> pts/cell = </span><span class="si">%d</span><span class="s2"> total points&quot;</span><span class="p">,</span>
+            <span class="n">num_cells</span><span class="p">,</span>
+            <span class="n">points_per_cell</span><span class="p">,</span>
+            <span class="n">total_points</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span></div>
+
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Extraction / injection</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="QuadratureExtractor.extract_values">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.extract_values">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_values</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract all values from a Quadrature function.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            A function defined on the registered Quadrature space.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Flat array of all integration-point values in cell order.</span>
+<span class="sd">            Shape ``(total_points * dof_per_value,)`` or reshaped</span>
+<span class="sd">            to ``(total_points, *tensor_shape)`` if tensor_shape is set.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="n">qd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span>
+        
+        <span class="n">dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cell_to_dof_map</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="n">dofs</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">qd</span><span class="o">.</span><span class="n">tensor_shape</span><span class="p">:</span>
+            <span class="c1"># Reshape to (total_points, *tensor_shape)</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">qd</span><span class="o">.</span><span class="n">total_points</span><span class="p">,</span> <span class="o">*</span><span class="n">qd</span><span class="o">.</span><span class="n">tensor_shape</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">values</span></div>
+
+
+<div class="viewcode-block" id="QuadratureExtractor.extract_cell_values">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.extract_cell_values">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_cell_values</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">,</span>
+        <span class="n">cell_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract values for a single cell (element).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            A function on the Quadrature space.</span>
+<span class="sd">        cell_index : int</span>
+<span class="sd">            The local cell index.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Values at the integration points of the specified cell.</span>
+<span class="sd">            Shape ``(points_per_cell,)`` for scalar, or</span>
+<span class="sd">            ``(points_per_cell, *tensor_shape)`` for tensors.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="n">dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cell_to_dof_map</span><span class="p">[</span><span class="n">cell_index</span><span class="p">]</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="n">dofs</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+        <span class="n">qd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span>
+        <span class="k">if</span> <span class="n">qd</span><span class="o">.</span><span class="n">tensor_shape</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">qd</span><span class="o">.</span><span class="n">points_per_cell</span><span class="p">,</span> <span class="o">*</span><span class="n">qd</span><span class="o">.</span><span class="n">tensor_shape</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">values</span></div>
+
+
+<div class="viewcode-block" id="QuadratureExtractor.inject_values">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.inject_values">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inject_values</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">,</span>
+        <span class="n">values</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Inject values into a Quadrature function.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            Target function on the Quadrature space.</span>
+<span class="sd">        values : np.ndarray</span>
+<span class="sd">            Values to inject.  Can be flat</span>
+<span class="sd">            ``(total_points * dof_per_value,)`` or shaped</span>
+<span class="sd">            ``(total_points, *tensor_shape)``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="n">flat</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+        <span class="n">dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cell_to_dof_map</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+        <span class="n">expected</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dofs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">flat</span><span class="p">)</span> <span class="o">!=</span> <span class="n">expected</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Expected </span><span class="si">{</span><span class="n">expected</span><span class="si">}</span><span class="s2"> values, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">flat</span><span class="p">)</span><span class="si">}</span><span class="s2">.  &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(total_points=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span><span class="o">.</span><span class="n">total_points</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;dof_per_value=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span><span class="o">.</span><span class="n">dof_per_value</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+        <span class="n">function</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="n">dofs</span><span class="p">]</span> <span class="o">=</span> <span class="n">flat</span></div>
+
+
+<div class="viewcode-block" id="QuadratureExtractor.inject_cell_values">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.inject_cell_values">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inject_cell_values</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">,</span>
+        <span class="n">cell_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">values</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Inject values for a single cell.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            Target function on the Quadrature space.</span>
+<span class="sd">        cell_index : int</span>
+<span class="sd">            The local cell index.</span>
+<span class="sd">        values : np.ndarray</span>
+<span class="sd">            Values for the integration points of this cell.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="n">dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cell_to_dof_map</span><span class="p">[</span><span class="n">cell_index</span><span class="p">]</span>
+        <span class="n">flat</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">flat</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dofs</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Cell </span><span class="si">{</span><span class="n">cell_index</span><span class="si">}</span><span class="s2">: expected </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">dofs</span><span class="p">)</span><span class="si">}</span><span class="s2"> values, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">flat</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="n">function</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="n">dofs</span><span class="p">]</span> <span class="o">=</span> <span class="n">flat</span></div>
+
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Batch operations for FE² dispatch</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="QuadratureExtractor.extract_for_dispatch">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.extract_for_dispatch">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_for_dispatch</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract per-cell integration-point values for dispatching to RVEs.</span>
+
+<span class="sd">        Returns a list of ``num_cells`` arrays, each of shape</span>
+<span class="sd">        ``(points_per_cell,)`` or ``(points_per_cell, *tensor_shape)``.</span>
+<span class="sd">        Cell ``i`` corresponds to RVE ``i``.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            Source function on the Quadrature space.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list[np.ndarray]</span>
+<span class="sd">            One array per cell.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="n">qd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">qd</span><span class="o">.</span><span class="n">num_cells</span><span class="p">):</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">extract_cell_values</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">i</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="QuadratureExtractor.inject_from_gather">
+<a class="viewcode-back" href="../../fenicsx_cosim.html#fenicsx_cosim.quadrature_extractor.QuadratureExtractor.inject_from_gather">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inject_from_gather</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="s2">&quot;dolfinx.fem.Function&quot;</span><span class="p">,</span>
+        <span class="n">cell_values</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Inject per-cell values gathered from RVE solves.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        function : dolfinx.fem.Function</span>
+<span class="sd">            Target function on the Quadrature space.</span>
+<span class="sd">        cell_values : list[np.ndarray]</span>
+<span class="sd">            One array per cell, as returned by the RVE workers.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="n">qd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cell_values</span><span class="p">)</span> <span class="o">!=</span> <span class="n">qd</span><span class="o">.</span><span class="n">num_cells</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Expected </span><span class="si">{</span><span class="n">qd</span><span class="o">.</span><span class="n">num_cells</span><span class="si">}</span><span class="s2"> cell results, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">cell_values</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">vals</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cell_values</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">inject_cell_values</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">vals</span><span class="p">)</span></div>
+
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Accessors</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">quadrature_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuadratureData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Metadata about the registered quadrature configuration.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">function_space</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The Quadrature function space.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell_to_dof_map</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Cell → global DoF index mapping — shape ``(num_cells, dofs_per_cell)``.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_registered</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cell_to_dof_map</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Internal helpers</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_cell_to_dof_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_cells</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">bs</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build the cell → global DoF index lookup table.&quot;&quot;&quot;</span>
+        <span class="n">dofmap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_function_space</span><span class="o">.</span><span class="n">dofmap</span>
+        <span class="n">num_dofs_per_cell</span> <span class="o">=</span> <span class="n">dofmap</span><span class="o">.</span><span class="n">dof_layout</span><span class="o">.</span><span class="n">num_dofs</span>
+        <span class="n">mapping</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">num_cells</span><span class="p">,</span> <span class="n">num_dofs_per_cell</span> <span class="o">*</span> <span class="n">bs</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_cells</span><span class="p">):</span>
+            <span class="n">blocks</span> <span class="o">=</span> <span class="n">dofmap</span><span class="o">.</span><span class="n">cell_dofs</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">bs</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">mapping</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">blocks</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">mapping</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="n">blocks</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">bs</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">bs</span><span class="p">))</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cell_to_dof_map</span> <span class="o">=</span> <span class="n">mapping</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Built cell→DoF map: </span><span class="si">%d</span><span class="s2"> cells × </span><span class="si">%d</span><span class="s2"> dofs/cell (bs=</span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
+            <span class="n">num_cells</span><span class="p">,</span>
+            <span class="n">num_dofs_per_cell</span><span class="p">,</span>
+            <span class="n">bs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_quadrature_coordinates</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="p">:</span> <span class="s2">&quot;dolfinx.mesh.Mesh&quot;</span><span class="p">,</span>
+        <span class="n">degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_cells</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">points_per_cell</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute physical coordinates of all integration points.</span>
+
+<span class="sd">        Uses the mesh geometry to push-forward reference quadrature</span>
+<span class="sd">        points to physical coordinates.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Shape ``(total_points, gdim)``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">gdim</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">dim</span>
+        <span class="n">tdim</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">dim</span>
+
+        <span class="c1"># Get the basix quadrature points for the reference cell</span>
+        <span class="n">cell_type</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">topology</span><span class="o">.</span><span class="n">cell_type</span>
+        <span class="n">basix_cell</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">basix</span><span class="o">.</span><span class="n">CellType</span><span class="p">,</span> <span class="n">cell_type</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">q_points</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">basix</span><span class="o">.</span><span class="n">make_quadrature</span><span class="p">(</span><span class="n">basix_cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+
+        <span class="c1"># Map each cell&#39;s reference points to physical coordinates</span>
+        <span class="c1"># using the mesh coordinate element</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">x</span>  <span class="c1"># physical node coordinates</span>
+        <span class="n">dofmap_geom</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">dofmap</span>
+
+        <span class="n">cmap</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">cmap</span>
+
+        <span class="n">total</span> <span class="o">=</span> <span class="n">num_cells</span> <span class="o">*</span> <span class="n">points_per_cell</span>
+        <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">total</span><span class="p">,</span> <span class="n">gdim</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_cells</span><span class="p">):</span>
+            <span class="n">cell_nodes</span> <span class="o">=</span> <span class="n">dofmap_geom</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span>
+            <span class="n">cell_node_coords</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">cell_nodes</span><span class="p">,</span> <span class="p">:</span><span class="n">gdim</span><span class="p">]</span>  <span class="c1"># (num_geom_dofs, gdim)</span>
+            <span class="n">phys</span> <span class="o">=</span> <span class="n">cmap</span><span class="o">.</span><span class="n">push_forward</span><span class="p">(</span><span class="n">q_points</span><span class="p">,</span> <span class="n">cell_node_coords</span><span class="p">)</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="n">cell</span> <span class="o">*</span> <span class="n">points_per_cell</span>
+            <span class="n">coords</span><span class="p">[</span><span class="n">start</span> <span class="p">:</span> <span class="n">start</span> <span class="o">+</span> <span class="n">points_per_cell</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">phys</span>
+
+        <span class="k">return</span> <span class="n">coords</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_registered</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_quad_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;No quadrature space registered. Call register() first.&quot;</span>
+            <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Lavakumar Veludandi.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
