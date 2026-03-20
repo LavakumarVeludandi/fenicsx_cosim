@@ -1,4 +1,4 @@
-name: Deploy Sphinx Docs to GitHub Pages
+name: Deploy Docs to GitHub Pages
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
 
       - name: Install Sphinx and dependencies
         run: |
-          pip install sphinx sphinx-rtd-theme numpy
+          pip install sphinx sphinx-rtd-theme myst-parser numpy
 
       - name: Build HTML Docs
         run: |
@@ -37,7 +37,7 @@ jobs:
           sphinx-apidoc -o . ../src/fenicsx_cosim
           # Build HTML
           make html
-          # Prevent GitHub's Jekyll from hiding Sphinx CSS files
+          # Prevent Jekyll from ignoring Sphinx underscore folders (like _static)
           touch _build/html/.nojekyll
 
       - name: Upload artifact
