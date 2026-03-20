@@ -37,6 +37,8 @@ jobs:
           sphinx-apidoc -o . ../src/fenicsx_cosim
           # Build HTML
           make html
+          # Prevent Jekyll from ignoring Sphinx underscore folders (like _static)
+          touch _build/html/.nojekyll
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
