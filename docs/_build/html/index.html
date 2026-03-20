@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FEniCSx CoSim documentation &mdash; FEniCSx CoSim nightly documentation</title>
+  <title>FEniCSx CoSim Documentation &mdash; FEniCSx CoSim nightly documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
@@ -19,7 +19,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="fenicsx_cosim" href="modules.html" /> 
+    <link rel="next" title="fenicsx-cosim" href="README.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -41,7 +41,13 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Documentation:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="README.html">fenicsx-cosim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ARCHITECTURE.html">FEniCSx CoSim Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HPC_SLURM_GUIDE.html">FEniCSx Co-Simulation on HPC (SLURM)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="modules.html">fenicsx_cosim</a></li>
 </ul>
@@ -60,7 +66,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">FEniCSx CoSim documentation</li>
+      <li class="breadcrumb-item active">FEniCSx CoSim Documentation</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -71,12 +77,38 @@
            <div itemprop="articleBody">
              
   <section id="fenicsx-cosim-documentation">
-<h1>FEniCSx CoSim documentation<a class="headerlink" href="#fenicsx-cosim-documentation" title="Link to this heading"></a></h1>
-<p>Add your content using <code class="docutils literal notranslate"><span class="pre">reStructuredText</span></code> syntax. See the
-<a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html">reStructuredText</a>
-documentation for details.</p>
+<h1>FEniCSx CoSim Documentation<a class="headerlink" href="#fenicsx-cosim-documentation" title="Link to this heading"></a></h1>
+<p>Welcome to the <strong>FEniCSx CoSim</strong> documentation! This library provides partitioned multiphysics coupling capabilities for FEniCSx.</p>
 <div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<p class="caption" role="heading"><span class="caption-text">Documentation:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="README.html">fenicsx-cosim</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="README.html#features">Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README.html#quick-start">Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README.html#architecture">Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README.html#advanced-examples">Advanced Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README.html#running-tests">Running Tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README.html#development-roadmap">Development Roadmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="README.html#license">License</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ARCHITECTURE.html">FEniCSx CoSim Architecture</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ARCHITECTURE.html#core-components">🏗️ Core Components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ARCHITECTURE.html#two-main-workflows-api-flow">🔄 Two Main Workflows &amp; API Flow</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="HPC_SLURM_GUIDE.html">FEniCSx Co-Simulation on HPC (SLURM)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="HPC_SLURM_GUIDE.html#network-address-resolution">1. Network Address Resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="HPC_SLURM_GUIDE.html#approach-a-single-monolithic-slurm-script-recommended-for-fe2">2. Approach A: Single Monolithic SLURM Script (Recommended for FE²)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="HPC_SLURM_GUIDE.html#approach-b-two-disconnected-slurm-jobs-loose-coupling-amr">3. Approach B: Two Disconnected SLURM Jobs (Loose Coupling / AMR)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="HPC_SLURM_GUIDE.html#technical-considerations-for-slurm">Technical Considerations for SLURM</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="modules.html">fenicsx_cosim</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="fenicsx_cosim.html">fenicsx_cosim package</a></li>
@@ -90,7 +122,7 @@ documentation for details.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="modules.html" class="btn btn-neutral float-right" title="fenicsx_cosim" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="README.html" class="btn btn-neutral float-right" title="fenicsx-cosim" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

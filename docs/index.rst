@@ -3,17 +3,22 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-FEniCSx CoSim documentation
+FEniCSx CoSim Documentation
 ===========================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
+Welcome to the **FEniCSx CoSim** documentation! This library provides partitioned multiphysics coupling capabilities for FEniCSx.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Documentation:
+
+   README.md
+   ARCHITECTURE.md
+   HPC_SLURM_GUIDE.md
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference:
 
    modules
 
