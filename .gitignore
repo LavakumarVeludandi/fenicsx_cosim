@@ -8,6 +8,7 @@ __pycache__/
 dist/
 build/
 *.whl
+docs/_build/
 
 # Virtual environments
 .venv/
