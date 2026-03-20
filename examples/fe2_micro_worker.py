@@ -16,6 +16,8 @@ Usage
     Terminals 2-N (Workers): python fe2_micro_worker.py
 """
 
+import sys
+
 import numpy as np
 
 from fenicsx_cosim import CouplingInterface
@@ -65,12 +67,14 @@ def solve_rve(index_in_batch: int, strain: np.ndarray, metadata: dict) -> np.nda
 # 2. Worker Setup & Loop
 # ========================================================================
 print(f"[FE2_Worker] Starting Scatter/Gather Worker...")
+master_host = sys.argv[1] if len(sys.argv) > 1 else "localhost"
+
 cosim_worker = CouplingInterface(
     name="MicroWorker",
     role="Worker",
     topology="scatter-gather",
-    push_endpoint="tcp://localhost:5557",  # Connect to Master's Pull
-    pull_endpoint="tcp://localhost:5556",  # Connect to Master's Push
+    push_endpoint=f"tcp://{master_host}:5557",  # Connect to Master's Pull
+    pull_endpoint=f"tcp://{master_host}:5556",  # Connect to Master's Push
 )
 
 print(f"[FE2_Worker] Connected to Master.")

@@ -425,6 +425,8 @@ class ScatterGatherCommunicator:
 
     def close(self) -> None:
         """Close all sockets."""
+        if not self._connected:
+            return
         for sock in (self._push_socket, self._pull_socket):
             if sock is not None and not sock.closed:
                 sock.close()

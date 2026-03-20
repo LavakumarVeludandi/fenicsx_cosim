@@ -178,10 +178,8 @@ class QuadratureExtractor:
         num_cells = mesh.topology.index_map(tdim).size_local
 
         # Determine quadrature points per cell from the function space
-        # The number of DoFs per cell gives us points_per_cell * dof_per_value
         dofmap = self._function_space.dofmap
-        num_dofs_per_cell = dofmap.dof_layout.num_dofs
-        points_per_cell = num_dofs_per_cell // dof_per_value
+        points_per_cell = dofmap.dof_layout.num_dofs
 
         total_points = num_cells * points_per_cell
 
@@ -191,7 +189,7 @@ class QuadratureExtractor:
         )
 
         # Build cell → global DoF mapping
-        self._build_cell_to_dof_map(num_cells)
+        self._build_cell_to_dof_map(num_cells, dof_per_value)
 
         self._quad_data = QuadratureData(
             num_cells=num_cells,
@@ -245,12 +243,11 @@ class QuadratureExtractor:
         num_cells = mesh.topology.index_map(tdim).size_local
 
         dofmap = function_space.dofmap
-        num_dofs_per_cell = dofmap.dof_layout.num_dofs
-        points_per_cell = num_dofs_per_cell // dof_per_value
+        points_per_cell = dofmap.dof_layout.num_dofs
 
         total_points = num_cells * points_per_cell
 
-        self._build_cell_to_dof_map(num_cells)
+        self._build_cell_to_dof_map(num_cells, dof_per_value)
 
         self._quad_data = QuadratureData(
             num_cells=num_cells,
@@ -291,8 +288,10 @@ class QuadratureExtractor:
             to ``(total_points, *tensor_shape)`` if tensor_shape is set.
         """
         self._check_registered()
-        values = np.asarray(function.x.array, dtype=np.float64).copy()
         qd = self._quad_data
+        
+        dofs = self._cell_to_dof_map.ravel()
+        values = np.asarray(function.x.array[dofs], dtype=np.float64).copy()
 
         if qd.tensor_shape:
             # Reshape to (total_points, *tensor_shape)
@@ -349,14 +348,15 @@ class QuadratureExtractor:
         """
         self._check_registered()
         flat = values.ravel()
-        expected = len(function.x.array)
+        dofs = self._cell_to_dof_map.ravel()
+        expected = len(dofs)
         if len(flat) != expected:
             raise ValueError(
                 f"Expected {expected} values, got {len(flat)}.  "
                 f"(total_points={self._quad_data.total_points}, "
                 f"dof_per_value={self._quad_data.dof_per_value})"
             )
-        function.x.array[:] = flat
+        function.x.array[dofs] = flat
 
     def inject_cell_values(
         self,
@@ -465,18 +465,23 @@ class QuadratureExtractor:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _build_cell_to_dof_map(self, num_cells: int) -> None:
+    def _build_cell_to_dof_map(self, num_cells: int, bs: int) -> None:
         """Build the cell → global DoF index lookup table."""
         dofmap = self._function_space.dofmap
         num_dofs_per_cell = dofmap.dof_layout.num_dofs
-        mapping = np.empty((num_cells, num_dofs_per_cell), dtype=np.int64)
+        mapping = np.empty((num_cells, num_dofs_per_cell * bs), dtype=np.int64)
         for i in range(num_cells):
-            mapping[i, :] = dofmap.cell_dofs(i)
+            blocks = dofmap.cell_dofs(i)
+            if bs == 1:
+                mapping[i, :] = blocks
+            else:
+                mapping[i, :] = (blocks[:, None] * bs + np.arange(bs)).ravel()
         self._cell_to_dof_map = mapping
         logger.debug(
-            "Built cell→DoF map: %d cells × %d dofs/cell",
+            "Built cell→DoF map: %d cells × %d dofs/cell (bs=%d)",
             num_cells,
             num_dofs_per_cell,
+            bs,
         )
 
     def _compute_quadrature_coordinates(
@@ -509,11 +514,7 @@ class QuadratureExtractor:
         x = mesh.geometry.x  # physical node coordinates
         dofmap_geom = mesh.geometry.dofmap
 
-        # Tabulate the geometry basis functions at the quadrature points
         cmap = mesh.geometry.cmap
-        tab = cmap.tabulate(0, q_points)
-        # tab[0] has shape (num_q_points, num_geometry_dofs)
-        basis_vals = tab[0, :, :, 0]  # (num_q_points, num_geom_dofs)
 
         total = num_cells * points_per_cell
         coords = np.empty((total, gdim), dtype=np.float64)
@@ -521,8 +522,7 @@ class QuadratureExtractor:
         for cell in range(num_cells):
             cell_nodes = dofmap_geom[cell]
             cell_node_coords = x[cell_nodes, :gdim]  # (num_geom_dofs, gdim)
-            # Physical coords = basis_vals @ cell_node_coords
-            phys = basis_vals @ cell_node_coords  # (points_per_cell, gdim)
+            phys = cmap.push_forward(q_points, cell_node_coords)
             start = cell * points_per_cell
             coords[start : start + points_per_cell, :] = phys
 

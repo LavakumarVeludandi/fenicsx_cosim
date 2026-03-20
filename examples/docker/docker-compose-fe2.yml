@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   fe2_macro:
@@ -14,7 +13,7 @@ services:
   fe2_micro:
     image: wingsoflava/fenicsx-cosim:nightly
     container_name: fe2_micro
-    command: ["python3", "examples/fe2_micro_worker.py"]
+    command: ["python3", "examples/fe2_micro_worker.py", "fe2_macro"]
     volumes:
       - ../..:/workspace
     working_dir: /workspace

@@ -132,6 +132,7 @@ class CouplingInterface:
         self._registered = False
         self._quad_registered = False
         self._step_count = 0
+        self._disconnected = False
 
         # --- Topology-specific setup ------------------------------------
         if topology == "scatter-gather":
@@ -756,11 +757,14 @@ class CouplingInterface:
 
     def disconnect(self) -> None:
         """Gracefully close the connection to the partner solver."""
+        if getattr(self, "_disconnected", False):
+            return
         if self._communicator is not None:
             self._communicator.close()
         if self._sg_communicator is not None:
             self._sg_communicator.close()
         logger.info("[%s] Disconnected", self.name)
+        self._disconnected = True
 
     def _check_registered(self) -> None:
         if not self._registered:
