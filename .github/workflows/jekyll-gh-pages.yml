@@ -33,8 +33,8 @@ jobs:
       - name: Build HTML Docs
         run: |
           cd docs
-          # Build source .rst files from python stubs
-          sphinx-apidoc -o . ../src/fenicsx_cosim
+          # Build source .rst files from python stubs (force overwrite)
+          sphinx-apidoc -f -o . ../src/fenicsx_cosim
           # Build HTML
           make html
           # Prevent Jekyll from ignoring Sphinx underscore folders (like _static)

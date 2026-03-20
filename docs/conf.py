@@ -5,7 +5,7 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../src'))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -27,7 +27,11 @@ extensions = [
     'myst_parser',
 ]
 
-autodoc_mock_imports = ['dolfinx', 'basix', 'mpi4py', 'ufl', 'petsc4py', 'scipy', 'zmq']
+autodoc_mock_imports = [
+    'dolfinx', 'basix', 'mpi4py', 'ufl', 'petsc4py', 'scipy', 'zmq',
+    'dolfinx.fem', 'dolfinx.mesh', 'dolfinx.common', 'dolfinx.cpp',
+    'scipy.sparse', 'scipy.spatial', 'scipy.interpolate'
+]
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
