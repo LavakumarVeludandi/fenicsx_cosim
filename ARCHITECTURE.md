@@ -19,9 +19,14 @@ The framework abstracts away network programming (ZeroMQ), data mapping (non-con
    - `MeshExtractor`: Extracts physical coordinates and degrees-of-freedom exclusively on the domain boundaries/facets to minimize data transmission.
    - `QuadratureExtractor`: Manipulates tensors directly at the integration (Gauss) points of elements rather than at nodes.
 
-4. **`DataMappers`**:
    - `NearestNeighborMapper`: Provides fast geometric nearest-neighbor interpolation when the interacting meshes do not match (non-conforming grids).
    - `DynamicMapper`: An extension handling Adaptive Mesh Refinement (AMR); automatically recomputing the point clouds and interpolations mid-simulation without restarting.
+
+5. **`Adapters`** (Multi-Solver Pattern):
+   - `SolverAdapter` (ABC): The contract for hooking external solvers into `fenicsx-cosim`.
+   - `FEniCSxAdapter`: The default adapter wrapping `MeshExtractor`.
+   - `KratosAdapter`: Live memory-based coupling using the Kratos Python API.
+   - `AbaqusFileAdapter`: File-based staggered coupling for Abaqus wrappers.
 
 ---
 

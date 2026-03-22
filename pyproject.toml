@@ -25,14 +25,16 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 dependencies = [
-    "fenics-dolfinx>=0.10.0",
-    "mpi4py",
     "numpy>=1.24.0",
     "pyzmq>=25.0.0",
     "scipy>=1.10.0",
 ]
 
 [project.optional-dependencies]
+fenicsx = [
+    "fenics-dolfinx>=0.10.0",
+    "mpi4py",
+]
 dev = [
     "pytest>=7.0",
     "pytest-mpi",

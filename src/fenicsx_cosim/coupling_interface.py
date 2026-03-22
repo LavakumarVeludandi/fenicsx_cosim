@@ -44,6 +44,7 @@ from typing import Literal, Optional
 
 import numpy as np
 
+from fenicsx_cosim.adapters.base import SolverAdapter
 from fenicsx_cosim.communicator import Communicator
 from fenicsx_cosim.data_mapper import DataMapper, NearestNeighborMapper
 from fenicsx_cosim.dynamic_mapper import DynamicMapper
@@ -123,13 +124,15 @@ class CouplingInterface:
         self.topology = topology
 
         # --- Internal components (common) --------------------------------
-        self._extractor = MeshExtractor()
+        self._extractor: Optional[MeshExtractor] = None
+        self._adapter: Optional[SolverAdapter] = None
         self._quad_extractor: Optional[QuadratureExtractor] = None
         self._mapper: Optional[DataMapper] = None
         self._dynamic_mapper: Optional[DynamicMapper] = None
         self._partner_coords: Optional[np.ndarray] = None
         self._function_space = None
         self._registered = False
+        self._adapter_registered = False
         self._quad_registered = False
         self._step_count = 0
         self._disconnected = False
@@ -191,6 +194,169 @@ class CouplingInterface:
             )
 
     # ==================================================================
+    # Alternative constructor: from any SolverAdapter
+    # ==================================================================
+
+    @classmethod
+    def from_adapter(
+        cls,
+        adapter: SolverAdapter,
+        name: str,
+        partner_name: str = "Partner",
+        role: Optional[str] = None,
+        endpoint: Optional[str] = None,
+        connection_type: str = "tcp",
+        timeout_ms: int = 30_000,
+        enable_mapping: bool = True,
+    ) -> "CouplingInterface":
+        """Create a CouplingInterface using any :class:`SolverAdapter`.
+
+        This allows non-FEniCSx solvers (Kratos, Abaqus, etc.) to
+        participate in fenicsx-cosim coupling via their respective
+        adapters.
+
+        Parameters
+        ----------
+        adapter : SolverAdapter
+            A concrete adapter for the solver.
+        name : str
+            Identifier for this solver.
+        partner_name : str, optional
+            Identifier of the partner solver.
+        role : {"bind", "connect"}, optional
+            ZeroMQ role.  Auto-determined if ``None``.
+        endpoint : str, optional
+            ZeroMQ endpoint.
+        connection_type : {"tcp", "ipc"}, optional
+            Transport type.
+        timeout_ms : int, optional
+            Receive timeout.
+        enable_mapping : bool, optional
+            Build nearest-neighbour mapper.
+
+        Returns
+        -------
+        CouplingInterface
+        """
+        instance = cls(
+            name=name,
+            partner_name=partner_name,
+            role=role,
+            endpoint=endpoint,
+            connection_type=connection_type,
+            timeout_ms=timeout_ms,
+            enable_mapping=enable_mapping,
+            topology="pair",
+        )
+        instance._adapter = adapter
+        return instance
+
+    def register_adapter_interface(self) -> None:
+        """Register the coupling interface using the attached adapter.
+
+        Extracts boundary coordinates from the adapter and exchanges
+        them with the partner solver to build the data mapping.
+
+        Raises
+        ------
+        RuntimeError
+            If no adapter has been set (use :meth:`from_adapter`).
+        """
+        if self._adapter is None:
+            raise RuntimeError(
+                f"[{self.name}] No adapter set. "
+                "Create via CouplingInterface.from_adapter()."
+            )
+        my_coords = self._adapter.get_boundary_coordinates()
+        self._exchange_coordinates(my_coords)
+        self._adapter_registered = True
+        logger.info(
+            "[%s] Adapter interface registered — %d boundary nodes",
+            self.name, len(my_coords),
+        )
+
+    def _ensure_extractor(self) -> None:
+        """Lazily instantiate MeshExtractor if needed."""
+        if self._extractor is None:
+            from fenicsx_cosim.mesh_extractor import MeshExtractor
+            self._extractor = MeshExtractor()
+
+    def _ensure_quad_extractor(self) -> None:
+        """Lazily instantiate QuadratureExtractor if needed."""
+        if self._quad_extractor is None:
+            from fenicsx_cosim.quadrature_extractor import QuadratureExtractor
+            self._quad_extractor = QuadratureExtractor()
+
+    def export_via_adapter(
+        self,
+        field_name: str,
+    ) -> None:
+        """Extract field from adapter and send to partner.
+
+        Parameters
+        ----------
+        field_name : str
+            Field name as understood by the adapter.
+        """
+        self._check_adapter_registered()
+        values = self._adapter.extract_field(field_name)
+        self._communicator.send_array(field_name, values)
+        logger.debug(
+            "[%s] Exported '%s' via adapter — %d values",
+            self.name, field_name, len(values),
+        )
+
+    def import_via_adapter(
+        self,
+        field_name: str,
+    ) -> None:
+        """Receive field from partner and inject into adapter.
+
+        Parameters
+        ----------
+        field_name : str
+            Expected field name.
+        """
+        self._check_adapter_registered()
+        received_name, received_values = self._communicator.receive_array()
+
+        if received_name != field_name:
+            logger.warning(
+                "[%s] Expected '%s' but received '%s'",
+                self.name, field_name, received_name,
+            )
+
+        # Apply mapping if meshes differ
+        if self._mapper is not None:
+            mapped_values = self._mapper.map(received_values)
+        else:
+            mapped_values = received_values
+
+        self._adapter.inject_field(field_name, mapped_values)
+        logger.debug(
+            "[%s] Imported '%s' via adapter — %d values injected",
+            self.name, received_name, len(mapped_values),
+        )
+
+    def advance_adapter(self) -> None:
+        """Synchronize and advance the adapter's solver."""
+        self._check_adapter_registered()
+        self._communicator.synchronize()
+        self._adapter.advance()
+        self._step_count += 1
+        logger.debug(
+            "[%s] Adapter time step %d complete",
+            self.name, self._step_count,
+        )
+
+    def _check_adapter_registered(self) -> None:
+        if not self._adapter_registered:
+            raise RuntimeError(
+                f"[{self.name}] No adapter interface registered. "
+                "Call register_adapter_interface() first."
+            )
+
+    # ==================================================================
     # Interface registration (standard boundary coupling)
     # ==================================================================
 
@@ -224,6 +390,7 @@ class CouplingInterface:
         self._function_space = function_space
 
         # Extract boundary information
+        self._ensure_extractor()
         self._extractor.register(mesh, facet_tags, marker_id, function_space)
 
         # Exchange boundary coordinates with partner for mapping
@@ -262,6 +429,7 @@ class CouplingInterface:
             )
         self._function_space = function_space
 
+        self._ensure_extractor()
         self._extractor.register_from_locator(
             mesh, locator_fn, function_space, marker_id
         )
@@ -446,7 +614,7 @@ class CouplingInterface:
         tensor_shape : tuple[int, ...], optional
             Shape of the tensor at each integration point.
         """
-        self._quad_extractor = QuadratureExtractor()
+        self._ensure_quad_extractor()
 
         # Determine if we got a function space or a mesh
         if hasattr(function_space_or_mesh, "dofmap"):
@@ -789,7 +957,14 @@ class CouplingInterface:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.disconnect()
+        try:
+            self.disconnect()
+        except Exception:
+            pass
 
     def __del__(self) -> None:
-        self.disconnect()
+        if not getattr(self, "_disconnected", True):
+            try:
+                self.disconnect()
+            except Exception:
+                pass

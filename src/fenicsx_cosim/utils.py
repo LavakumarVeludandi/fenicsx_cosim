@@ -50,15 +50,13 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
 # Serialization helpers (NumPy ↔ bytes for ZeroMQ)
 # ---------------------------------------------------------------------------
 
-import scipy.sparse as sps
-
 # Wire protocol:
 #   Frame 0  – header  (JSON bytes):  {"name": ..., "dtype": ..., "shape": ..., "type": ...}
 #   Frame 1  – payload (raw ndarray bytes for dense, or dat/idx/ptr for sparse)
 #   If type is "sparse_csr", Frame 1 = data, Frame 2 = indices, Frame 3 = indptr
 
 def serialize_array(
-    name: str, array: np.ndarray | sps.csr_matrix
+    name: str, array: Any
 ) -> list[bytes]:
     """Serialize a named NumPy array or SciPy sparse matrix into a multipart ZeroMQ message.
 
@@ -74,36 +72,38 @@ def serialize_array(
     list[bytes]
         A multi-frame message.
     """
-    if sps.issparse(array):
-        # Convert to CSR format to simplify
-        csr = array.tocsr()
-        header = {
-            "name": name,
-            "type": "sparse_csr",
-            "dtype": str(csr.dtype),
-            "shape": list(csr.shape),
-        }
-        return [
-            json.dumps(header).encode("utf-8"),
-            csr.data.tobytes(),
-            csr.indices.tobytes(),
-            csr.indptr.tobytes(),
-        ]
-    else:
-        # Standard dense NumPy array
-        header = {
-            "name": name,
-            "type": "dense",
-            "dtype": str(array.dtype),
-            "shape": list(array.shape),
-        }
-        return [
-            json.dumps(header).encode("utf-8"),
-            array.tobytes(),
-        ]
+    # Check if sparse using duck typing to avoid importing scipy unnecessarily
+    if hasattr(array, "format") and hasattr(array, "tocsr"):
+        import scipy.sparse as sps
+        if sps.issparse(array):
+            # Convert to CSR format to simplify
+            csr = array.tocsr()
+            header = {
+                "name": name,
+                "type": "sparse_csr",
+                "dtype": str(csr.dtype),
+                "shape": list(csr.shape),
+            }
+            return [
+                json.dumps(header).encode("utf-8"),
+                csr.data.tobytes(),
+                csr.indices.tobytes(),
+                csr.indptr.tobytes(),
+            ]
+    # Standard dense NumPy array
+    header = {
+        "name": name,
+        "type": "dense",
+        "dtype": str(array.dtype),
+        "shape": list(array.shape),
+    }
+    return [
+        json.dumps(header).encode("utf-8"),
+        array.tobytes(),
+    ]
 
 
-def deserialize_array(frames: list[bytes]) -> tuple[str, np.ndarray | sps.csr_matrix]:
+def deserialize_array(frames: list[bytes]) -> tuple[str, Any]:
     """Reconstruct a named array or matrix from a multipart ZeroMQ message.
 
     Parameters
@@ -113,12 +113,13 @@ def deserialize_array(frames: list[bytes]) -> tuple[str, np.ndarray | sps.csr_ma
 
     Returns
     -------
-    tuple[str, np.ndarray | sps.csr_matrix]
+    tuple[str, Any]
         ``(name, array)`` – the identifier and reconstructed data.
     """
     header = json.loads(frames[0].decode("utf-8"))
     
     if header.get("type", "dense") == "sparse_csr":
+        import scipy.sparse as sps
         data = np.frombuffer(frames[1], dtype=np.dtype(header["dtype"]))
         indices = np.frombuffer(frames[2], dtype=np.int32)
         indptr = np.frombuffer(frames[3], dtype=np.int32)

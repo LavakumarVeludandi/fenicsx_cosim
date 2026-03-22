@@ -33,3 +33,6 @@ Thumbs.db
 # Simulation Output
 *.xdmf
 *.h5
+
+# Temporary files
+playground/*

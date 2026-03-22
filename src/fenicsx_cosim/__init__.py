@@ -35,21 +35,32 @@ Example (FE² Scatter-Gather)
 
 __version__ = "0.2.0"
 
-from fenicsx_cosim.coupling_interface import CouplingInterface
-from fenicsx_cosim.mesh_extractor import MeshExtractor
+from fenicsx_cosim.adapters import SolverAdapter, KratosAdapter, AbaqusFileAdapter
 from fenicsx_cosim.communicator import Communicator
+from fenicsx_cosim.coupling_interface import CouplingInterface
 from fenicsx_cosim.data_mapper import DataMapper, NearestNeighborMapper
 from fenicsx_cosim.dynamic_mapper import DynamicMapper
-from fenicsx_cosim.quadrature_extractor import QuadratureExtractor
 from fenicsx_cosim.scatter_gather_communicator import ScatterGatherCommunicator
+
+# Optional FEniCSx-dependent modules
+try:
+    from fenicsx_cosim.mesh_extractor import MeshExtractor
+    from fenicsx_cosim.quadrature_extractor import QuadratureExtractor
+    _HAS_FENICSX = True
+except ImportError:
+    _HAS_FENICSX = False
 
 __all__ = [
     "CouplingInterface",
-    "MeshExtractor",
     "Communicator",
     "DataMapper",
     "NearestNeighborMapper",
     "DynamicMapper",
-    "QuadratureExtractor",
     "ScatterGatherCommunicator",
+    "SolverAdapter",
+    "KratosAdapter",
+    "AbaqusFileAdapter",
 ]
+
+if _HAS_FENICSX:
+    __all__.extend(["MeshExtractor", "QuadratureExtractor"])

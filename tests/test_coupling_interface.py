@@ -47,7 +47,7 @@ def _create_mesh_and_tags():
 
 def _run_solver_a(results: dict, endpoint: str) -> None:
     """Thermal solver (bind side)."""
-    from fenicsx_cosim import CouplingInterface
+    from fenicsx_cosim.coupling_interface import CouplingInterface
 
     try:
         mesh, facet_tags = _create_mesh_and_tags()
@@ -92,7 +92,7 @@ def _run_solver_a(results: dict, endpoint: str) -> None:
 
 def _run_solver_b(results: dict, endpoint: str) -> None:
     """Mechanical solver (connect side)."""
-    from fenicsx_cosim import CouplingInterface
+    from fenicsx_cosim.coupling_interface import CouplingInterface
 
     try:
         time.sleep(0.3)  # Let solver A bind first

@@ -148,6 +148,36 @@ export PYTHONPATH=src
 python examples/shakedown_optimizer_worker.py
 ```
 
+### 4. Coupling with Kratos Multiphysics (via ZeroMQ)
+Demonstrates the `KratosAdapter` coupling a FEniCSx mechanical solver to a native Kratos thermal solver in real-time.
+
+Terminal 1 (Kratos thermal Server):
+```bash
+export PYTHONPATH=src
+python examples/kratos_thermal_solver.py
+```
+
+Terminal 2 (FEniCSx mechanical Client):
+```bash
+export PYTHONPATH=src
+python examples/fenicsx_kratos_mechanical.py
+```
+
+### 5. File-Based Staggered Coupling with Abaqus
+Demonstrates the `AbaqusFileAdapter` syncing a FEniCSx thermal solver with an Abaqus Python wrapper using shared NumPy `.npy` files.
+
+Terminal 1 (FEniCSx thermal Client):
+```bash
+export PYTHONPATH=src
+python examples/fenicsx_abaqus_thermal.py
+```
+
+Terminal 2 (Abaqus wrapper Server):
+```bash
+export PYTHONPATH=src
+python examples/abaqus_coupling_wrapper.py
+```
+
 ## Running Tests
 
 Make sure the `src` directory is in your `PYTHONPATH` before running the tests. All tests require `fenics-dolfinx` to be installed in your environment.
