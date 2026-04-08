@@ -2,7 +2,7 @@
 # fenicsx-cosim
 
 <p align="center">
-  <img src="docs/media/fenicsx-cosim.svg" alt="fenicsx-cosim logo" width="280">
+  <img src="docs/media/fenicsx-cosim.svg" alt="fenicsx-cosim logo">
 </p>
 
 [![Documentation Status](https://img.shields.io/badge/docs-online-blue)](https://lavakumarveludandi.github.io/fenicsx_cosim/)
