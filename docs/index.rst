@@ -6,6 +6,11 @@
 FEniCSx CoSim Documentation
 ===========================
 
+.. image:: media/fenicsx-cosim.svg
+   :alt: fenicsx-cosim logo
+   :width: 280px
+   :align: center
+
 Welcome to the **FEniCSx CoSim** documentation! This library provides partitioned multiphysics coupling capabilities for FEniCSx.
 
 .. toctree::
@@ -21,4 +26,3 @@ Welcome to the **FEniCSx CoSim** documentation! This library provides partitione
    :caption: API Reference:
 
    modules
-

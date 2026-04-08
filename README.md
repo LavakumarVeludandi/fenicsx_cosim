@@ -1,6 +1,10 @@
 
 # fenicsx-cosim
 
+<p align="center">
+  <img src="docs/media/fenicsx-cosim.svg" alt="fenicsx-cosim logo" width="280">
+</p>
+
 [![Documentation Status](https://img.shields.io/badge/docs-online-blue)](https://lavakumarveludandi.github.io/fenicsx_cosim/)
 
 **Documentation:** [https://lavakumarveludandi.github.io/fenicsx_cosim/](https://lavakumarveludandi.github.io/fenicsx_cosim/)
