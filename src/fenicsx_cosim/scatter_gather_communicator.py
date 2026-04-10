@@ -94,7 +94,8 @@ class ScatterGatherCommunicator:
         * Worker: connects to this endpoint (to pull work items).
     timeout_ms : int, optional
         Receive timeout for blocking pulls.  Default 300 000 ms for master
-        (waiting for RVE results), 60 000 ms for workers.
+        (waiting for RVE results), 60 000 ms for workers. Set to ``0`` (or
+        negative) to disable timeout and wait forever.
     """
 
     def __init__(
@@ -113,7 +114,8 @@ class ScatterGatherCommunicator:
             timeout_ms = (
                 _GATHER_TIMEOUT_MS if role == "master" else _SCATTER_TIMEOUT_MS
             )
-        self.timeout_ms = timeout_ms
+        self.timeout_ms = int(timeout_ms)
+        self._socket_timeout_ms = -1 if self.timeout_ms <= 0 else self.timeout_ms
 
         self._ctx = zmq.Context.instance()
         self._push_socket: Optional[zmq.Socket] = None
@@ -143,7 +145,7 @@ class ScatterGatherCommunicator:
             # Master PULLS results back (collector)
             self._pull_socket = self._ctx.socket(zmq.PULL)
             self._pull_socket.setsockopt(zmq.LINGER, 1000)
-            self._pull_socket.setsockopt(zmq.RCVTIMEO, self.timeout_ms)
+            self._pull_socket.setsockopt(zmq.RCVTIMEO, self._socket_timeout_ms)
             self._pull_socket.bind(self.pull_endpoint)
 
             logger.debug(
@@ -154,7 +156,7 @@ class ScatterGatherCommunicator:
             # Worker PULLS work items from master's ventilator
             self._pull_socket = self._ctx.socket(zmq.PULL)
             self._pull_socket.setsockopt(zmq.LINGER, 1000)
-            self._pull_socket.setsockopt(zmq.RCVTIMEO, self.timeout_ms)
+            self._pull_socket.setsockopt(zmq.RCVTIMEO, self._socket_timeout_ms)
             self._pull_socket.connect(self.pull_endpoint)
 
             # Worker PUSHES results to master's collector
@@ -253,7 +255,9 @@ class ScatterGatherCommunicator:
                 elapsed = time.time() - start_time
                 raise TimeoutError(
                     f"[Master] Gather timed out after {elapsed:.1f}s — "
-                    f"received {len(results)}/{n_expected} results"
+                    f"received {len(results)}/{n_expected} results "
+                    f"(timeout_ms={self.timeout_ms}). Increase communicator "
+                    "timeout via config/env for large jobs."
                 )
 
             header = json.loads(frames[0].decode("utf-8"))
@@ -333,7 +337,9 @@ class ScatterGatherCommunicator:
         try:
             frames = self._pull_socket.recv_multipart()
         except zmq.Again:
-            raise TimeoutError("[Worker] Pull timed out waiting for work")
+            raise TimeoutError(
+                f"[Worker] Pull timed out waiting for work (timeout_ms={self.timeout_ms})"
+            )
 
         # Check for shutdown
         if len(frames) == 1 and frames[0] == SHUTDOWN_SIGNAL:
