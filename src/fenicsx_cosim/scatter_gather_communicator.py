@@ -104,10 +104,12 @@ class ScatterGatherCommunicator:
         push_endpoint: str = "tcp://*:5556",
         pull_endpoint: str = "tcp://*:5557",
         timeout_ms: Optional[int] = None,
+        sndhwm: Optional[int] = None,
     ) -> None:
         self.role = role
         self.push_endpoint = push_endpoint
         self.pull_endpoint = pull_endpoint
+        self._sndhwm = sndhwm
         self._connected = False
 
         if timeout_ms is None:
@@ -139,7 +141,11 @@ class ScatterGatherCommunicator:
             # Master PUSHES work out (ventilator)
             self._push_socket = self._ctx.socket(zmq.PUSH)
             self._push_socket.setsockopt(zmq.LINGER, 1000)
-            self._push_socket.setsockopt(zmq.SNDHWM, 0)  # unlimited queue
+            # Throttle outbound queue to prevent early-joiner syphon.
+            # Default SNDHWM=1 is conservative (safest for single-worker case).
+            # Callers with N workers should pass sndhwm=N to allow 1 msg/peer buffered.
+            hwm = self._sndhwm if self._sndhwm is not None else 1
+            self._push_socket.setsockopt(zmq.SNDHWM, hwm)
             self._push_socket.bind(self.push_endpoint)
 
             # Master PULLS results back (collector)
@@ -174,6 +180,32 @@ class ScatterGatherCommunicator:
                 "[Worker] Connected PULL to %s, PUSH to %s",
                 self.pull_endpoint, self.push_endpoint,
             )
+
+    # ------------------------------------------------------------------
+    # Master connection helpers
+    # ------------------------------------------------------------------
+
+    def slow_start(self, delay_seconds: float = 0.5) -> None:
+        """Wait briefly for worker connections before the first scatter.
+
+        ZMQ PUSH round-robins only across *connected* peers.  If workers
+        connect after scatter() begins, the first peer syphons all buffered
+        messages.  A short delay gives Apptainer containers time to start
+        and establish connections before work is dispatched.
+
+        Parameters
+        ----------
+        delay_seconds : float, optional
+            Seconds to wait (default 0.5 s — conservative for Pleiades
+            container startup variance).
+        """
+        self._check_role("master", "slow_start")
+        logger.info(
+            "[Master] slow_start: waiting %.1f s for worker connections...",
+            delay_seconds,
+        )
+        time.sleep(delay_seconds)
+        logger.info("[Master] slow_start: proceeding with scatter")
 
     # ------------------------------------------------------------------
     # Master API

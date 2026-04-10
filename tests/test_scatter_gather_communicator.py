@@ -434,6 +434,116 @@ class TestShutdown:
 
 
 # ======================================================================
+# Tests: Syphon prevention (SNDHWM regression)
+# ======================================================================
+
+class TestSyphonPrevention:
+    """Regression test: no single worker should drain the entire queue.
+
+    This guards against the early-joiner syphon bug where SNDHWM=0 allowed
+    the first-connected worker to buffer and process all work items before
+    other workers had a chance to connect.
+    """
+
+    def test_fair_distribution_4_workers_8_items(self):
+        """With 4 workers and 8 items, no worker should get all 8 items.
+
+        A perfect split is 2 each, but ZMQ round-robin under load can vary.
+        We only assert that no single worker monopolises the queue (the syphon
+        case), meaning each worker must get at least 1 item.
+        """
+        ports = _get_free_ports()
+        # Need 4 port pairs — reuse helper for additional ports
+        import socket
+        extra_socks = []
+        extra_ports = []
+        for _ in range(6):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(("", 0))
+            extra_ports.append(s.getsockname()[1])
+            extra_socks.append(s)
+        for s in extra_socks:
+            s.close()
+
+        push_ep = f"tcp://127.0.0.1:{ports[0]}"
+        pull_ep = f"tcp://127.0.0.1:{ports[1]}"
+
+        n_items = 8
+        n_workers = 4
+
+        master = ScatterGatherCommunicator(
+            role="master",
+            push_endpoint=push_ep,
+            pull_endpoint=pull_ep,
+            timeout_ms=15_000,
+            sndhwm=n_workers,  # Fix 1: throttle to 1 per connected peer
+        )
+        time.sleep(0.1)
+
+        workers = []
+        for _ in range(n_workers):
+            w = ScatterGatherCommunicator(
+                role="worker",
+                push_endpoint=pull_ep,
+                pull_endpoint=push_ep,
+                timeout_ms=10_000,
+            )
+            workers.append(w)
+
+        # Give all workers time to connect before scatter
+        time.sleep(0.3)
+
+        work_items = [np.array([float(i)]) for i in range(n_items)]
+        items_per_worker = [0] * n_workers
+        lock = threading.Lock()
+        results = [None]
+
+        def master_side():
+            master.scatter(work_items)
+            results[0] = master.gather(n_items)
+            master.broadcast_shutdown(n_workers)
+
+        def worker_side(w, worker_idx):
+            while True:
+                try:
+                    idx, data, meta = w.pull_work()
+                    with lock:
+                        items_per_worker[worker_idx] += 1
+                    w.push_result(idx, data)
+                except StopIteration:
+                    break
+                except TimeoutError:
+                    break
+
+        threads = [threading.Thread(target=master_side)]
+        for i, w in enumerate(workers):
+            threads.append(threading.Thread(target=worker_side, args=(w, i)))
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=20)
+
+        assert results[0] is not None
+        assert len(results[0]) == n_items
+
+        # Core assertion: no single worker syphoned all items
+        assert max(items_per_worker) < n_items, (
+            f"Syphon detected: one worker processed all {n_items} items. "
+            f"Distribution: {items_per_worker}"
+        )
+        # Every worker should have received at least one item
+        assert all(c > 0 for c in items_per_worker), (
+            f"Some workers received no work (starvation). "
+            f"Distribution: {items_per_worker}"
+        )
+
+        master.close()
+        for w in workers:
+            w.close()
+
+
+# ======================================================================
 # Tests: work_loop
 # ======================================================================
 
