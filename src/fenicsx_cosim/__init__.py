@@ -41,6 +41,7 @@ from fenicsx_cosim.coupling_interface import CouplingInterface
 from fenicsx_cosim.data_mapper import DataMapper, NearestNeighborMapper
 from fenicsx_cosim.dynamic_mapper import DynamicMapper
 from fenicsx_cosim.scatter_gather_communicator import ScatterGatherCommunicator
+from fenicsx_cosim.demand_driven_broker import DemandDrivenBroker
 
 # Optional FEniCSx-dependent modules
 try:
@@ -57,6 +58,7 @@ __all__ = [
     "NearestNeighborMapper",
     "DynamicMapper",
     "ScatterGatherCommunicator",
+    "DemandDrivenBroker",
     "SolverAdapter",
     "KratosAdapter",
     "AbaqusFileAdapter",
