@@ -156,6 +156,12 @@ class ScatterGatherCommunicator:
             # Worker PULLS work items from master's ventilator
             self._pull_socket = self._ctx.socket(zmq.PULL)
             self._pull_socket.setsockopt(zmq.LINGER, 1000)
+            
+            # CRITICAL: Prevent a single worker from syphoning the entire batch.
+            # RCVHWM=1 ensures this worker only pulls one item from the master's PUSH pipe.
+            # The master will then distribute subsequent items to other connected workers.
+            self._pull_socket.setsockopt(zmq.RCVHWM, 1)
+            
             self._pull_socket.setsockopt(zmq.RCVTIMEO, self._socket_timeout_ms)
             self._pull_socket.connect(self.pull_endpoint)
 
