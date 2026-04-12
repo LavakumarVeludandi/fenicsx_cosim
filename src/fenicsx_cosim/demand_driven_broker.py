@@ -81,6 +81,7 @@ class DemandDrivenBroker:
         self,
         work_items: list[np.ndarray],
         metadata: Optional[list[dict]] = None,
+        on_result: Optional[Any] = None,
     ) -> list[np.ndarray]:
         """Serve work items to dynamic workers and gather results simultaneously.
         
@@ -114,8 +115,11 @@ class DemandDrivenBroker:
                     array = np.frombuffer(
                         frames[1], dtype=np.dtype(header["dtype"])
                     ).reshape(header["shape"])
-                    results[idx] = array.copy()
+                    result_copy = array.copy()
+                    results[idx] = result_copy
                     completed += 1
+                    if on_result is not None:
+                        on_result(idx, result_copy)
                     logger.debug("[Master] Received result for task %d (%d/%d done)", idx, completed, n_items)
             
             # Formulate immediately reply (either next task or wait signal)
