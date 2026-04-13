@@ -19,14 +19,18 @@ This gives true demand-driven scheduling and near-ideal dynamic load balancing.
 
 Architecture diagram::
 
-    ┌───────────────┐  ◄── REQ: request / submit_result ──┐
-    │               │                                      │
-    │   Master      │  ──► REP: solve / wait / shutdown ──┤ Worker 0
-    │ (REP broker)  │                                      ├──────────
-    │  task queue   │  ◄── REQ: request / submit_result ──┤ Worker 1
-    │               │  ──► REP: solve / wait / shutdown ──┤
-    └───────────────┘  ◄── REQ: request / submit_result ──┤ Worker N
-                       ──► REP: solve / wait / shutdown ──┘
+    ┌───────────────────────────┐      ┌──────────────────┐
+    │      Master / Broker      │◄─────│ Worker 0 (REQ)   │
+    │         (REP sock)        │ REQ  └──────────────────┘
+    │  - global pending queue   │      ┌──────────────────┐
+    │  - records submitted      │◄─────│ Worker 1 (REQ)   │
+    │    results                │ REQ  └──────────────────┘
+    │  - replies with action:   │      ┌──────────────────┐
+    │    solve / wait /         │◄─────│ Worker N (REQ)   │
+    │    shutdown               │ REQ  └──────────────────┘
+    └───────────────────────────┘
+              │
+              └── REP to requesting worker: solve(task) / wait / shutdown
 
 Typical usage (Master)
 ----------------------
