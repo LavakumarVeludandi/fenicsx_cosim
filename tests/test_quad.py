@@ -1,29 +1,27 @@
-import numpy as np
-import dolfinx
-from mpi4py import MPI
-import basix
-import basix.ufl
+import pytest
 
-mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 1, 1)
 
-# scalar
-e_scalar = basix.ufl.quadrature_element(basix.CellType.triangle, degree=2)
-V_scalar = dolfinx.fem.functionspace(mesh, e_scalar)
+dolfinx = pytest.importorskip("dolfinx")
+basix = pytest.importorskip("basix")
+pytest.importorskip("basix.ufl")
+MPI = pytest.importorskip("mpi4py").MPI
 
-# tensor
-e_tensor = basix.ufl.quadrature_element(basix.CellType.triangle, degree=2, value_shape=(2, 2))
-V_tensor = dolfinx.fem.functionspace(mesh, e_tensor)
 
-print("SCALAR:")
-print("dofmap num dofs per cell:", V_scalar.dofmap.dof_layout.num_dofs)
-print("index_map_bs:", V_scalar.dofmap.index_map_bs)
-f_s = dolfinx.fem.Function(V_scalar)
-print("function array len:", len(f_s.x.array))
-print("cell_dofs(0):", V_scalar.dofmap.cell_dofs(0))
+def test_quadrature_functionspace_layout():
+    mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 1, 1)
 
-print("\nTENSOR:")
-print("dofmap num dofs per cell:", V_tensor.dofmap.dof_layout.num_dofs)
-print("index_map_bs:", V_tensor.dofmap.index_map_bs)
-f_t = dolfinx.fem.Function(V_tensor)
-print("function array len:", len(f_t.x.array))
-print("cell_dofs(0):", V_tensor.dofmap.cell_dofs(0))
+    scalar_element = basix.ufl.quadrature_element(basix.CellType.triangle, degree=2)
+    scalar_space = dolfinx.fem.functionspace(mesh, scalar_element)
+
+    tensor_element = basix.ufl.quadrature_element(
+        basix.CellType.triangle, degree=2, value_shape=(2, 2)
+    )
+    tensor_space = dolfinx.fem.functionspace(mesh, tensor_element)
+
+    scalar_function = dolfinx.fem.Function(scalar_space)
+    tensor_function = dolfinx.fem.Function(tensor_space)
+
+    assert scalar_space.dofmap.dof_layout.num_dofs > 0
+    assert tensor_space.dofmap.dof_layout.num_dofs > 0
+    assert len(scalar_function.x.array) > 0
+    assert len(tensor_function.x.array) > 0
