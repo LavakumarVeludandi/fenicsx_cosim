@@ -1,6 +1,49 @@
 """
-DemandDrivenBroker — Request-Reply Task Queue for true dynamic load balancing.
-Replaces the stateless PUSH/PULL pattern with strict REQ/REP semantics.
+DemandDrivenBroker — Dynamic REQ/REP work broker for FE² RVE scheduling.
+
+The ``ScatterGatherCommunicator`` uses a queue-like PUSH/PULL pattern where
+tasks are pre-scattered and workers consume them as available.  For highly
+heterogeneous RVE costs (different convergence behavior, nonlinear response,
+or mixed hardware), fixed pre-distribution can still produce idle workers.
+
+The ``DemandDrivenBroker`` switches to strict ``REQ/REP`` handshaking:
+
+* **Master (Broker):** Holds the full task queue and responds to each worker
+  request with exactly one action: ``solve`` (new task), ``wait`` (temporarily
+  no work), or ``shutdown`` (terminate worker loop).
+* **Workers (RVE Solvers):** Explicitly request work only when ready.  The
+  previous result can be piggybacked on the next request, so fast workers
+  immediately receive more work while slow workers naturally receive less.
+
+This gives true demand-driven scheduling and near-ideal dynamic load balancing.
+
+Architecture diagram::
+
+    ┌──────────┐   REQ: request / submit_result   ┌───────────────┐
+    │ Worker 0 │ ─────────────────────────────────►│               │
+    ├──────────┤                                    │   Master      │
+    │ Worker 1 │ ─────────────────────────────────►│ (REP broker)  │
+    ├──────────┤                                    │  task queue   │
+    │ Worker N │ ─────────────────────────────────►│               │
+    └──────────┘◄───────────────────────────────────│               │
+                 REP: solve / wait / shutdown      └───────────────┘
+
+Typical usage (Master)
+----------------------
+>>> broker = DemandDrivenBroker(role="master", endpoint="tcp://*:5556")
+>>> results = broker.dispatch_gather(work_items, metadata=rve_metadata)
+>>> broker.broadcast_shutdown(n_workers)
+
+Typical usage (Worker)
+----------------------
+>>> broker = DemandDrivenBroker(role="worker", endpoint="tcp://master:5556")
+>>> while True:
+...     try:
+...         idx, data, meta = broker.pull_work()
+...     except StopIteration:
+...         break
+...     result = solve_rve(data, meta)
+...     broker.push_result(idx, result)
 """
 from __future__ import annotations
 
