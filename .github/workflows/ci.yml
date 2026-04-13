@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: dolfinx/dolfinx:v0.10.0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install package and dev deps
+        run: pip install -e ".[dev]" --break-system-packages
+
+      - name: Run tests
+        run: |
+          export PYTHONPATH=src
+          pytest tests/ -v --cov=fenicsx_cosim --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
