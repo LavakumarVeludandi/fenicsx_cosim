@@ -5,6 +5,10 @@
   <img src="docs/media/fenicsx-cosim.svg" alt="fenicsx-cosim logo">
 </p>
 
+[![CI](https://github.com/LavakumarVeludandi/fenicsx_cosim/actions/workflows/ci.yml/badge.svg)](https://github.com/LavakumarVeludandi/fenicsx_cosim/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/fenicsx-cosim)](https://pypi.org/project/fenicsx-cosim)
+[![codecov](https://codecov.io/gh/LavakumarVeludandi/fenicsx_cosim/badge.svg)](https://codecov.io/gh/LavakumarVeludandi/fenicsx_cosim)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Documentation Status](https://img.shields.io/badge/docs-online-blue)](https://lavakumarveludandi.github.io/fenicsx_cosim/)
 
 **Documentation:** [https://lavakumarveludandi.github.io/fenicsx_cosim/](https://lavakumarveludandi.github.io/fenicsx_cosim/)
