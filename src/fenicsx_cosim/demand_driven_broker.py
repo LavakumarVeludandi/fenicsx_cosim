@@ -19,18 +19,23 @@ This gives true demand-driven scheduling and near-ideal dynamic load balancing.
 
 Architecture diagram::
 
-    ┌───────────────────────────┐      ┌──────────────────┐
-    │      Master / Broker      │◄─────│ Worker 0 (REQ)   │
-    │         (REP sock)        │ REQ  └──────────────────┘
-    │  - global pending queue   │      ┌──────────────────┐
-    │  - records submitted      │◄─────│ Worker 1 (REQ)   │
-    │    results                │ REQ  └──────────────────┘
-    │  - replies with action:   │      ┌──────────────────┐
-    │    solve / wait /         │◄─────│ Worker N (REQ)   │
-    │    shutdown               │ REQ  └──────────────────┘
-    └───────────────────────────┘
-              │
-              └── REP to requesting worker: solve(task) / wait / shutdown
+    (single ZeroMQ endpoint: REQ/REP)
+
+    ┌───────────────────────────────────────────────────────────────────┐
+    │                     Master / Broker (REP)                        │
+    │  - holds pending task queue                                      │
+    │  - on REQ: store optional submitted result                       │
+    │  - replies with one of: solve(task), wait, shutdown              │
+    └───────────────────────────────────────────────────────────────────┘
+              ▲                          ▲                          ▲
+              │ REQ: request_work OR     │ REQ: request_work OR     │
+              │      submit_result(i,σ)  │      submit_result(i,σ)  │
+              │                          │                          │
+              ▼ REP: solve/wait/shutdown ▼ REP: solve/wait/shutdown ▼
+         ┌─────────────┐             ┌─────────────┐            ┌─────────────┐
+         │ Worker 0    │             │ Worker 1    │            │ Worker N    │
+         │ (REQ client)│             │ (REQ client)│            │ (REQ client)│
+         └─────────────┘             └─────────────┘            └─────────────┘
 
 Typical usage (Master)
 ----------------------
