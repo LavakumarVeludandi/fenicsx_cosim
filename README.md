@@ -29,17 +29,9 @@
 ## Installation
 
 ```bash
-pip install fenicsx-cosim
-```
-
-For local development:
-```bash
-pip install -e ".[dev]"
-```
-
-For FEniCSx-based workflows:
-```bash
-pip install -e ".[fenicsx]"
+git clone https://github.com/LavakumarVeludandi/fenicsx_cosim.git
+cd fenicsx_cosim
+pip install -e .
 ```
 
 ### Dependencies
