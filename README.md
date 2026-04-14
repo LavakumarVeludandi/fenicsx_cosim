@@ -23,22 +23,34 @@
 - **ZeroMQ IPC** — Uses PyZMQ for inter-process communication that doesn't interfere with FEniCSx's internal MPI
 - **Automatic Mesh Mapping** — Nearest-neighbor interpolation via `scipy.spatial.KDTree` for non-conforming boundaries
 - **FEniCSx Native** — Works directly with `dolfinx.fem.Function`, `dolfinx.mesh.Mesh`, and `MeshTags`
+- **Multiple Coupling Topologies** — `PAIR` (1-to-1), `PUSH/PULL` scatter-gather FE², and `REQ/REP` demand-driven FE² broker support
+- **Adapter-Based Integration** — Native adapter abstractions for FEniCSx, Kratos, and Abaqus workflows
 
 ## Installation
 
 ```bash
-pip install -e .
+pip install fenicsx-cosim
+```
+
+For local development:
+```bash
+pip install -e ".[dev]"
+```
+
+For FEniCSx-based workflows:
+```bash
+pip install -e ".[fenicsx]"
 ```
 
 ### Dependencies
 
-| Package | Purpose |
+| Package | Type | Purpose |
 |---|---|
-| `fenics-dolfinx >= 0.10.0` | Core finite element backend |
-| `mpi4py` | MPI parallel support |
-| `numpy >= 1.24.0` | Array manipulation |
-| `pyzmq >= 25.0.0` | Inter-Process Communication |
-| `scipy >= 1.10.0` | KDTree for mesh mapping |
+| `numpy >= 1.24.0` | Core | Array manipulation |
+| `pyzmq >= 25.0.0` | Core | Inter-process communication |
+| `scipy >= 1.10.0` | Core | KDTree-based mapping |
+| `fenics-dolfinx >= 0.10.0` | Optional (`fenicsx`) | FEniCSx coupling backend |
+| `mpi4py` | Optional (`fenicsx`) | MPI support for FEniCSx runs |
 
 ## Quick Start
 
@@ -106,7 +118,9 @@ while t < T:
 | `DataMapper` | `scipy.spatial.KDTree` nearest-neighbor mapping for non-conforming meshes |
 | `DynamicMapper` | Handles AMR mesh-remapping via ZeroMQ mesh-update negotiation |
 | `QuadratureExtractor` | FE² integration point data extraction (via basix & ufl) |
-| `ScatterGatherCommunicator`| ZeroMQ `PUSH/PULL` sockets for parallel RVE dispatch |
+| `ScatterGatherCommunicator` | ZeroMQ `PUSH/PULL` sockets for parallel RVE dispatch |
+| `DemandDrivenBroker` | ZeroMQ `REQ/REP` demand-driven scheduling for dynamically balanced FE² workers |
+| `SolverAdapter` + adapters | External solver bridge abstractions (`FEniCSxAdapter`, `KratosAdapter`, `AbaqusFileAdapter`) |
 
 ## Advanced Examples
 
@@ -188,22 +202,23 @@ python examples/abaqus_coupling_wrapper.py
 
 ## Running Tests
 
-Make sure the `src` directory is in your `PYTHONPATH` before running the tests. All tests require `fenics-dolfinx` to be installed in your environment.
+Install development dependencies and run tests from the repository root:
 
 ```bash
+pip install -e ".[dev]"
 export PYTHONPATH=src
 pytest tests/ -v
 ```
 
+Note: tests that require `fenics-dolfinx` are automatically skipped when DOLFINx is unavailable.
+
 ## Development Roadmap
 
-| Phase | Status | Description |
-|---|---|---|
-| Phase 1 — Core Data Extraction | ✅ | `MeshExtractor` for boundary DoF isolation |
-| Phase 2 — IPC Layer | ✅ | `Communicator` with PyZMQ |
-| Phase 3 — Integration & API | ✅ | `CouplingInterface` combining all components |
-| Phase 4 — Mapping | ✅ | `NearestNeighborMapper` with KDTree |
-| Phase 5 — Advanced Features | ✅ | `AMR` negotiation, `FE²` dispatch, and Sparse `Shakedown` transfer |
+For current and planned work, see:
+
+- [`ROADMAP.md`](ROADMAP.md)
+- [`CHANGELOG.md`](CHANGELOG.md)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## License
 
