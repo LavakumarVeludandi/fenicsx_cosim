@@ -6,6 +6,7 @@ with real C++ backed objects. If Kratos is not installed, these tests are skippe
 """
 
 import numpy as np
+import pytest
 
 try:
     import KratosMultiphysics as KM
@@ -16,6 +17,11 @@ except ImportError:
 
 from fenicsx_cosim.adapters.kratos_adapter import KratosAdapter
 
+pytestmark = pytest.mark.skip(
+    reason="Manual-only integration tests requiring a local Kratos installation."
+)
+
+@pytest.fixture
 def kratos_model_part():
     """Create a real Kratos ModelPart with a coupling interface."""
     model = KM.Model()
