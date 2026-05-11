@@ -133,11 +133,22 @@ class DemandDrivenBroker:
         self,
         work_items: list[np.ndarray],
         metadata: Optional[list[dict]] = None,
+<<<<<<< HEAD
         on_result: Optional[Any] = None,
+=======
+        on_result=None,
+>>>>>>> 7eb5282 (Fixed demand driven communicator)
     ) -> list[np.ndarray]:
         """Serve work items to dynamic workers and gather results simultaneously.
         
         Blocks until all items are completed.
+
+        Parameters
+        ----------
+        on_result : callable, optional
+            Called as ``on_result(i, result_array)`` immediately when each
+            result arrives (before the method returns).  Useful for live
+            persistence / progress callbacks.
         """
         self._check_role("master", "dispatch_gather")
         n_items = len(work_items)
@@ -173,6 +184,8 @@ class DemandDrivenBroker:
                     if on_result is not None:
                         on_result(idx, result_copy)
                     logger.debug("[Master] Received result for task %d (%d/%d done)", idx, completed, n_items)
+                    if on_result is not None:
+                        on_result(idx, results[idx])
             
             # Formulate immediately reply (either next task or wait signal)
             if pending_items:
