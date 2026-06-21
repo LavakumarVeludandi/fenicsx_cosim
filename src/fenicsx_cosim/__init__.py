@@ -37,8 +37,11 @@ __version__ = "0.2.0"
 
 from fenicsx_cosim.adapters import SolverAdapter, KratosAdapter, AbaqusFileAdapter
 from fenicsx_cosim.communicator import Communicator
+from fenicsx_cosim.convergence import Aitken, IQNILS, fixed_point_iterate
 from fenicsx_cosim.coupling_interface import CouplingInterface
-from fenicsx_cosim.data_mapper import DataMapper, NearestNeighborMapper
+from fenicsx_cosim.data_mapper import (
+    DataMapper, InverseDistanceMapper, NearestNeighborMapper,
+)
 from fenicsx_cosim.dynamic_mapper import DynamicMapper
 from fenicsx_cosim.scatter_gather_communicator import ScatterGatherCommunicator
 from fenicsx_cosim.demand_driven_broker import DemandDrivenBroker
@@ -56,7 +59,11 @@ __all__ = [
     "Communicator",
     "DataMapper",
     "NearestNeighborMapper",
+    "InverseDistanceMapper",
     "DynamicMapper",
+    "Aitken",
+    "IQNILS",
+    "fixed_point_iterate",
     "ScatterGatherCommunicator",
     "DemandDrivenBroker",
     "SolverAdapter",

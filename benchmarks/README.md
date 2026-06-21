@@ -7,8 +7,13 @@ are enforced in CI via `tests/test_benchmarks.py`.
 
 | Benchmark | Validates | Analytic reference | Tolerance |
 |---|---|---|---|
-| `bench_mapping_accuracy.py` | `DataMapper` (nearest-neighbor) — the core field-transfer primitive | smooth field `sin(2πx)` mapped to a non-conforming target cloud | rel L2 error < 0.05 at finest; first-order convergence (rate ≈ 1) |
-| `bench_fe2_homogenization.py` | FE² homogenization (KUBC RVE + volume averaging) | homogeneous elastic RVE → `σ̄ = C : ε̄` (plane-strain Hooke); Hill-Mandel | rel error < 1e-7; Hill-Mandel residual < 1e-8 |
+| `bench_mapping_accuracy.py` | `DataMapper` — nearest-neighbor **and** inverse-distance (consistent) field transfer | smooth field `sin(2πx)` mapped to a non-conforming target cloud | NN: rel L2 < 0.05 finest, first-order (rate ≈ 1). IDW: beats NN; constant-field error < 1e-12 (consistency) |
+| `bench_implicit_coupling.py` | strong-coupling accelerators (`Aitken`, `IQNILS`) | affine fixed point `S(x)=Ax+b`, `x*=(I-A)^{-1}b`, ρ(A)>1 (added-mass: Gauss-Seidel diverges) | accelerated `‖x-x*‖` < 1e-7; IQN-ILS converges in ≤ n+2 sub-iterations |
+| `bench_fe2_homogenization.py` | RVE homogenization correctness (KUBC solve + volume averaging) — *not* the dispatch fabric | homogeneous elastic RVE → `σ̄ = C : ε̄` (plane-strain Hooke); Hill-Mandel | rel error < 1e-7; Hill-Mandel residual < 1e-8 |
+
+> The FE² **dispatch fabric** (scatter→worker→gather over ZeroMQ) is validated
+> separately by `tests/test_fe2_e2e.py` (real subprocess worker, path-dependent
+> round-trip), not by a benchmark.
 
 The FE² case is exact by construction: a homogeneous linear-elastic RVE under
 KUBC has the affine solution `u = ε̄·x`, exactly representable by the finite

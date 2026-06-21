@@ -216,3 +216,77 @@ class NearestNeighborMapper(DataMapper):
         if self._forward_distances is None:
             raise RuntimeError("Mapper not built.")
         return self._forward_distances
+
+
+class InverseDistanceMapper(DataMapper):
+    """Consistent k-nearest-neighbor inverse-distance (Shepard) mapping.
+
+    Each target value is a weighted average of its ``k`` nearest source values
+    with weights ``1 / d**power``. The weights form a partition of unity (sum to
+    1), so the map is **consistent**: it reproduces a constant field exactly and
+    converges faster than nearest-neighbor for smooth fields. Coincident points
+    (``d -> 0``) collapse to the exact source value.
+
+    This is the lightweight upgrade over :class:`NearestNeighborMapper`. It is
+    *not* a conservative Galerkin/RBF projection (that needs FE mass matrices and
+    is future scope) — use it for smooth interface fields where consistency and
+    smoothness matter more than discrete flux conservation.
+
+    Parameters
+    ----------
+    k : int
+        Number of nearest source neighbors per target (clamped to N_src).
+    power : float
+        Inverse-distance exponent (2.0 is the usual Shepard choice).
+    """
+
+    def __init__(self, k: int = 4, power: float = 2.0) -> None:
+        if not _HAS_SCIPY:
+            raise ImportError("scipy is required for InverseDistanceMapper.")
+        self.k = k
+        self.power = power
+        self._forward: Optional[tuple] = None   # (idx, weights) target<-source
+        self._inverse: Optional[tuple] = None   # (idx, weights) source<-target
+        self.max_distance: Optional[float] = None
+
+    def _precompute(self, tree: "KDTree", query: np.ndarray, n_src: int) -> tuple:
+        k = min(self.k, n_src)
+        dist, idx = tree.query(query, k=k)
+        if k == 1:
+            dist = dist[:, None]
+            idx = idx[:, None]
+        w = 1.0 / np.maximum(dist, 1e-30) ** self.power
+        w = w / w.sum(axis=1, keepdims=True)
+        return idx, w, float(np.max(dist))
+
+    @staticmethod
+    def _apply(values: np.ndarray, packed: tuple) -> np.ndarray:
+        idx, w, _ = packed
+        nb = np.asarray(values)[idx]            # (N, k) or (N, k, D)
+        if nb.ndim == 2:
+            return np.einsum("nk,nk->n", w, nb)
+        return np.einsum("nk,nkd->nd", w, nb)
+
+    def build(self, source_coords: np.ndarray,
+              target_coords: np.ndarray) -> None:
+        src = np.asarray(source_coords, dtype=float)
+        tgt = np.asarray(target_coords, dtype=float)
+        src_tree, tgt_tree = KDTree(src), KDTree(tgt)
+        self._forward = self._precompute(src_tree, tgt, len(src))
+        self._inverse = self._precompute(tgt_tree, src, len(tgt))
+        self.max_distance = self._forward[2]
+        logger.info(
+            "Built InverseDistanceMapper (k=%d, power=%.1f): %d -> %d, "
+            "max distance %.3e", self.k, self.power, len(src), len(tgt),
+            self.max_distance,
+        )
+
+    def map(self, source_values: np.ndarray) -> np.ndarray:
+        if self._forward is None:
+            raise RuntimeError("Mapper not built. Call build() first.")
+        return self._apply(source_values, self._forward)
+
+    def inverse_map(self, target_values: np.ndarray) -> np.ndarray:
+        if self._inverse is None:
+            raise RuntimeError("Mapper not built. Call build() first.")
+        return self._apply(target_values, self._inverse)

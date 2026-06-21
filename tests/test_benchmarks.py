@@ -24,6 +24,13 @@ def test_mapping_accuracy_benchmark():
         assert r.passed, f"{r.name}: {r.value:.3e} > tol {r.tolerance:.3e}"
 
 
+def test_implicit_coupling_benchmark():
+    import bench_implicit_coupling as bench
+
+    for r in bench.run():
+        assert r.passed, f"{r.name}: {r.value:.3e} > tol {r.tolerance:.3e}"
+
+
 @pytest.mark.slow
 @pytest.mark.integration
 def test_fe2_homogenization_benchmark():

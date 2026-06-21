@@ -12,18 +12,52 @@
 
 **Documentation:** [https://lavakumarveludandi.github.io/fenicsx_cosim/](https://lavakumarveludandi.github.io/fenicsx_cosim/)
 
-**A Native Partitioned Multiphysics Coupling Library for FEniCSx**
+**The coupling layer for people who already live in FEniCSx.**
 
-`fenicsx-cosim` is a standalone Python package that enables partitioned multiphysics co-simulation for [FEniCSx](https://fenicsproject.org/) (v0.10+). Inspired by the architecture of [Kratos CoSimIO](https://github.com/KratosMultiphysics/CoSimIO), it provides a non-intrusive API for connecting independent FEniCSx solvers across different processes.
+`fenicsx-cosim` is a standalone, pure-Python package for partitioned
+multiphysics with [FEniCSx](https://fenicsproject.org/) (v0.10+). It is *not*
+trying to out-feature [preCICE](https://precice.org/) on generic FSI/CHT — it
+wins where preCICE is heavy or absent **for a FEniCSx-native workflow**:
+
+- **Zero-setup ergonomics** — `pip install`, pure Python, operate directly on
+  `dolfinx.fem.Function` / `Mesh` / `MeshTags`. No C++ runtime, no XML config,
+  no adapter compilation. Time-to-first-coupling is minutes.
+- **FE² task-farming** — scatter quadrature-point strains to a worker pool and
+  gather homogenized stresses (`PUSH/PULL`, `REQ/REP` broker). preCICE couples a
+  fixed set of participants over a shared interface mesh; it does **not** do
+  many-subproblem RVE dispatch. This one is ours.
+- **FEniCSx ↔ Kratos mesh/material translation** — write/read real Kratos
+  `.mdpa` + `StructuralMaterials.json` (registered element families, Properties,
+  SubModelParts) that Kratos actually loads. A *translator*, orthogonal to
+  field coupling — nobody else does it.
+
+### When to use which
+
+| You want… | Use |
+|---|---|
+| FEniCSx FE² homogenization, RVE worker pools | **fenicsx-cosim** |
+| Move a mesh + material between FEniCSx and Kratos | **fenicsx-cosim** |
+| Quick partitioned coupling between FEniCSx and one other code, minimal setup | **fenicsx-cosim** |
+| Production FSI/CHT across many codes (OpenFOAM, SU2, CalculiX), IQN quasi-Newton, RBF/waveform mapping | **preCICE** |
+
+See [`docs/comparison_precice.md`](docs/comparison_precice.md) for the honest,
+specific breakdown.
+
+> **Note.** Coupling *two FEniCSx solvers* that could be one program is an
+> anti-pattern — solve it monolithically. Partitioning earns its keep only
+> across **different codes** (the connector case) or for **many independent
+> subproblems** (FE²). The examples below are framed accordingly.
 
 ## Features
 
-- **Clean API** — A single `CouplingInterface` class hides all networking and mapping complexity
-- **ZeroMQ IPC** — Uses PyZMQ for inter-process communication that doesn't interfere with FEniCSx's internal MPI
-- **Automatic Mesh Mapping** — Nearest-neighbor interpolation via `scipy.spatial.KDTree` for non-conforming boundaries
+- **Clean API** — A single `CouplingInterface` class hides networking and mapping
+- **ZeroMQ IPC** — PyZMQ inter-process communication that doesn't interfere with FEniCSx's internal MPI
 - **FEniCSx Native** — Works directly with `dolfinx.fem.Function`, `dolfinx.mesh.Mesh`, and `MeshTags`
-- **Multiple Coupling Topologies** — `PAIR` (1-to-1), `PUSH/PULL` scatter-gather FE², and `REQ/REP` demand-driven FE² broker support
-- **Adapter-Based Integration** — Native adapter abstractions for FEniCSx, Kratos, and Abaqus workflows
+- **Mesh Mapping** — nearest-neighbor and consistent (inverse-distance) interpolation for non-conforming boundaries
+- **Implicit coupling** — Aitken dynamic relaxation and IQN-ILS quasi-Newton for strongly-coupled (added-mass) problems
+- **Multiple Coupling Topologies** — `PAIR` (1-to-1), `PUSH/PULL` scatter-gather FE², and `REQ/REP` demand-driven FE² broker
+- **Adapter-Based Integration** — adapter abstractions for FEniCSx, Kratos, and Abaqus workflows
+- **Validated benchmarks** — analytic correctness gates in [`benchmarks/`](benchmarks/), enforced in CI
 
 ## Installation
 
