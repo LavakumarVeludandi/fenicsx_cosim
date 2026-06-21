@@ -34,5 +34,8 @@ Thumbs.db
 *.xdmf
 *.h5
 
+# Benchmark output (generated)
+benchmarks/results/
+
 # Temporary files
 playground/*

@@ -133,11 +133,7 @@ class DemandDrivenBroker:
         self,
         work_items: list[np.ndarray],
         metadata: Optional[list[dict]] = None,
-<<<<<<< HEAD
         on_result: Optional[Any] = None,
-=======
-        on_result=None,
->>>>>>> 7eb5282 (Fixed demand driven communicator)
     ) -> list[np.ndarray]:
         """Serve work items to dynamic workers and gather results simultaneously.
         
