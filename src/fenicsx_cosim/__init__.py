@@ -36,6 +36,7 @@ Example (FE² Scatter-Gather)
 __version__ = "0.2.0"
 
 from fenicsx_cosim.adapters import SolverAdapter, KratosAdapter, AbaqusFileAdapter
+from fenicsx_cosim.broker_communicator import BrokerClient, CouplingBroker
 from fenicsx_cosim.communicator import Communicator
 from fenicsx_cosim.convergence import Aitken, IQNILS, fixed_point_iterate
 from fenicsx_cosim.coupling_interface import CouplingInterface
@@ -66,6 +67,8 @@ __all__ = [
     "fixed_point_iterate",
     "ScatterGatherCommunicator",
     "DemandDrivenBroker",
+    "CouplingBroker",
+    "BrokerClient",
     "SolverAdapter",
     "KratosAdapter",
     "AbaqusFileAdapter",

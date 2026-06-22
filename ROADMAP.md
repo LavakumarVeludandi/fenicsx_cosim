@@ -44,10 +44,10 @@ The current `Communicator` uses ZeroMQ **PAIR** sockets which are strictly 1-to-
 Coupling three or more solvers (e.g. fluid + thermal + structural) requires a different
 socket pattern.
 
-- [ ] Implement `BrokerCommunicator` using ZeroMQ ROUTER/DEALER for N-solver topologies
-- [ ] Update `CouplingInterface` API to support named solver routing
-- [ ] Add example: three-way coupling (fluid + thermal + mechanical)
-- [ ] Add test: N=3 solver synchronisation and data exchange
+- [x] Implement broker using ZeroMQ ROUTER/DEALER for N-solver topologies — `CouplingBroker` + `BrokerClient` (`broker_communicator.py`): named routing, join barrier, N-way barrier
+- [ ] Update `CouplingInterface` API to wrap broker routing (currently the broker client is a standalone API)
+- [x] Add example: three-way coupling — `examples/three_way_broker.py`
+- [x] Add test: N=3 routing + barrier — `tests/test_broker_communicator.py`
 
 ---
 
