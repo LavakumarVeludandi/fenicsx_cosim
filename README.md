@@ -79,42 +79,58 @@ pip install -e .
 
 ## Quick Start
 
-### Thermal Solver (Terminal 1)
+### FE² homogenization — the flagship (one macro solver, a pool of RVE workers)
 
 ```python
-import dolfinx
-from mpi4py import MPI
 from fenicsx_cosim import CouplingInterface
 
-# Standard FEniCSx setup
-mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 20, 20)
-V = dolfinx.fem.functionspace(mesh, ("Lagrange", 1))
-temperature = dolfinx.fem.Function(V)
-
-# Initialize co-simulation
-cosim = CouplingInterface(name="ThermalSolver", partner_name="MechanicalSolver")
-cosim.register_interface(mesh, facet_tags, marker_id=1, function_space=V)
-
-# Time loop
-while t < T:
-    # ... solve thermal problem ...
-    cosim.export_data("TemperatureField", temperature)
-    cosim.import_data("DisplacementField", displacement)
-    cosim.advance_in_time()
+# Macro solver: scatter quadrature-point strains, gather homogenized stresses.
+macro = CouplingInterface(name="Macro", role="Master", topology="scatter-gather")
+macro.register_quadrature_space(V_quad)
+macro.scatter_gather_data("Strain", strain_fn, "Stress", stress_fn)
 ```
 
-### Mechanical Solver (Terminal 2)
+Start as many RVE workers as you want; each pulls a strain, solves its micro
+problem, and pushes back a stress. See `examples/fe2/`.
+
+### N > 2 coupling via the broker hub
 
 ```python
-from fenicsx_cosim import CouplingInterface
+from fenicsx_cosim import CouplingBroker, CouplingInterface
 
-cosim = CouplingInterface(name="MechanicalSolver", partner_name="ThermalSolver")
+# One hub process:
+CouplingBroker("tcp://*:5560", expected=3).start()
+
+# Each participant (Fluid / Thermal / Structure):
+ci = CouplingInterface(name="Fluid", topology="broker",
+                       endpoint="tcp://localhost:5560")
+ci.register_broker()                       # blocks until all 3 have joined
+ci.send_to("Thermal", "pressure", p_values)
+src, field, values = ci.receive_from()
+ci.barrier()
+```
+
+### Connector: FEniCSx ↔ another code (e.g. Kratos)
+
+> Two *FEniCSx* solvers that could be one program → solve monolithically.
+> Partitioning earns its keep only across **different codes**. Here the partner
+> is an external solver, and strong (implicit) coupling is wrapped with an
+> accelerator so added-mass problems converge.
+
+```python
+from fenicsx_cosim import CouplingInterface, IQNILS, fixed_point_iterate
+
+cosim = CouplingInterface(name="FEniCSxSolver", partner_name="ExternalSolver")
 cosim.register_interface(mesh, facet_tags, marker_id=1, function_space=V)
 
-while t < T:
-    cosim.import_data("TemperatureField", temperature)
-    # ... solve mechanical problem ...
-    cosim.export_data("DisplacementField", displacement)
+accel = IQNILS()                           # or Aitken() for cheap relaxation
+for _ in range(n_steps):
+    # one strong-coupling step: sub-iterate to a converged interface state
+    def coupled(x):                        # x = interface field (numpy)
+        cosim.export_data("Traction", x_to_function(x))
+        cosim.import_data("Displacement", disp)
+        return function_to_array(disp)
+    x_star, residuals = fixed_point_iterate(coupled, x0, accel)
     cosim.advance_in_time()
 ```
 
