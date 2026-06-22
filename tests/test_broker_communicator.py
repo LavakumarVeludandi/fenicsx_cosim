@@ -55,3 +55,38 @@ def test_three_way_ring_routing():
         assert src == sender
         assert dname == "field"
         assert np.allclose(arr, _PAYLOAD[sender])
+
+
+def _ci_participant(name: str, results: dict) -> None:
+    from fenicsx_cosim import CouplingInterface
+
+    ci = CouplingInterface(name=name, topology="broker", endpoint=_EP_CONN,
+                           timeout_ms=15_000)
+    try:
+        ci.register_broker()
+        ci.send_to(_RING[name], "field", _PAYLOAD[name])
+        results[name] = ci.receive_from()
+        ci.barrier()
+    finally:
+        ci.disconnect()
+
+
+def test_broker_through_coupling_interface():
+    """Same N=3 ring, driven through the CouplingInterface broker wrap."""
+    broker = CouplingBroker(_EP_BIND, expected=3).start()
+    results: dict = {}
+    threads = [threading.Thread(target=_ci_participant, args=(n, results))
+               for n in ("A", "B", "C")]
+    try:
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30)
+    finally:
+        broker.stop()
+
+    assert set(results) == {"A", "B", "C"}
+    for receiver, sender in (("B", "A"), ("C", "B"), ("A", "C")):
+        src, dname, arr = results[receiver]
+        assert src == sender and dname == "field"
+        assert np.allclose(arr, _PAYLOAD[sender])

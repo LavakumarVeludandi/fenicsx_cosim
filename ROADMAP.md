@@ -45,7 +45,7 @@ Coupling three or more solvers (e.g. fluid + thermal + structural) requires a di
 socket pattern.
 
 - [x] Implement broker using ZeroMQ ROUTER/DEALER for N-solver topologies — `CouplingBroker` + `BrokerClient` (`broker_communicator.py`): named routing, join barrier, N-way barrier
-- [ ] Update `CouplingInterface` API to wrap broker routing (currently the broker client is a standalone API)
+- [x] Update `CouplingInterface` API to wrap broker routing — `topology="broker"` + `register_broker`/`send_to`/`receive_from`/`barrier` (raw named-array N-way; Function-level N-way mapping is future scope)
 - [x] Add example: three-way coupling — `examples/three_way_broker.py`
 - [x] Add test: N=3 routing + barrier — `tests/test_broker_communicator.py`
 
