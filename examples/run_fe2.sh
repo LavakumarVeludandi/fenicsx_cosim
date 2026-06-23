@@ -1,20 +1,23 @@
 #!/bin/bash
-echo "Running FE2 Multiscale Coupling..."
+# Real FE² multiscale coupling: 2D macro elasticity (FEniCSx) whose constitutive
+# response at every macro quadrature point is a genuine two-phase J2 RVE solve
+# on a worker, exchanged over fenicsx-cosim scatter-gather.
+#
+# IMPORTANT: milestone 1 uses EXACTLY ONE worker. The RVE state is path-dependent
+# (J2 plasticity) and the scatter-gather socket round-robins with no worker
+# affinity, so a single stateful worker must own all RVE states (keyed by macro
+# quadrature-point index). Launching multiple workers would split each point's
+# plastic history across processes and corrupt it. See docs/fe2_design.md for the
+# milestone-2 plan (binary state frame) that lifts this to N parallel workers.
+set -e
+cd "$(dirname "$0")"
 
-# Start the macro solver (Master) in the background
-python fe2_macro_solver.py &
-PID_MACRO=$!
+echo "Running FE2 Multiscale Coupling (1 macro + 1 stateful worker)..."
 
-# Start 2 micro workers in the background
-python fe2_micro_worker.py &
-PID_WORKER1=$!
+python -m fe2.micro_worker localhost &
+PID_WORKER=$!
 
-python fe2_micro_worker.py &
-PID_WORKER2=$!
-
-# Wait for all processes to finish
-wait $PID_MACRO
-wait $PID_WORKER1
-wait $PID_WORKER2
+python -m fe2.macro_solver
+wait $PID_WORKER
 
 echo "Done with FE2 Coupling."

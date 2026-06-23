@@ -6,25 +6,58 @@
 </p>
 
 [![CI](https://github.com/LavakumarVeludandi/fenicsx_cosim/actions/workflows/ci.yml/badge.svg)](https://github.com/LavakumarVeludandi/fenicsx_cosim/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/fenicsx-cosim)](https://pypi.org/project/fenicsx-cosim)
 [![codecov](https://codecov.io/gh/LavakumarVeludandi/fenicsx_cosim/badge.svg)](https://codecov.io/gh/LavakumarVeludandi/fenicsx_cosim)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Documentation Status](https://img.shields.io/badge/docs-online-blue)](https://lavakumarveludandi.github.io/fenicsx_cosim/)
 
 **Documentation:** [https://lavakumarveludandi.github.io/fenicsx_cosim/](https://lavakumarveludandi.github.io/fenicsx_cosim/)
 
-**A Native Partitioned Multiphysics Coupling Library for FEniCSx**
+**The coupling layer for people who already live in FEniCSx.**
 
-`fenicsx-cosim` is a standalone Python package that enables partitioned multiphysics co-simulation for [FEniCSx](https://fenicsproject.org/) (v0.10+). Inspired by the architecture of [Kratos CoSimIO](https://github.com/KratosMultiphysics/CoSimIO), it provides a non-intrusive API for connecting independent FEniCSx solvers across different processes.
+`fenicsx-cosim` is a standalone, pure-Python package for partitioned
+multiphysics with [FEniCSx](https://fenicsproject.org/) (v0.10+). It is *not*
+trying to out-feature [preCICE](https://precice.org/) on generic FSI/CHT — it
+wins where preCICE is heavy or absent **for a FEniCSx-native workflow**:
+
+- **Zero-setup ergonomics** — `pip install`, pure Python, operate directly on
+  `dolfinx.fem.Function` / `Mesh` / `MeshTags`. No C++ runtime, no XML config,
+  no adapter compilation. Time-to-first-coupling is minutes.
+- **FE² task-farming** — scatter quadrature-point strains to a worker pool and
+  gather homogenized stresses (`PUSH/PULL`, `REQ/REP` broker). preCICE couples a
+  fixed set of participants over a shared interface mesh; it does **not** do
+  many-subproblem RVE dispatch. This one is ours.
+- **FEniCSx ↔ Kratos mesh/material translation** — write/read real Kratos
+  `.mdpa` + `StructuralMaterials.json` (registered element families, Properties,
+  SubModelParts) that Kratos actually loads. A *translator*, orthogonal to
+  field coupling — nobody else does it.
+
+### When to use which
+
+| You want… | Use |
+|---|---|
+| FEniCSx FE² homogenization, RVE worker pools | **fenicsx-cosim** |
+| Move a mesh + material between FEniCSx and Kratos | **fenicsx-cosim** |
+| Quick partitioned coupling between FEniCSx and one other code, minimal setup | **fenicsx-cosim** |
+| Production FSI/CHT across many codes (OpenFOAM, SU2, CalculiX), IQN quasi-Newton, RBF/waveform mapping | **preCICE** |
+
+See [`docs/comparison_precice.md`](docs/comparison_precice.md) for the honest,
+specific breakdown.
+
+> **Note.** Coupling *two FEniCSx solvers* that could be one program is an
+> anti-pattern — solve it monolithically. Partitioning earns its keep only
+> across **different codes** (the connector case) or for **many independent
+> subproblems** (FE²). The examples below are framed accordingly.
 
 ## Features
 
-- **Clean API** — A single `CouplingInterface` class hides all networking and mapping complexity
-- **ZeroMQ IPC** — Uses PyZMQ for inter-process communication that doesn't interfere with FEniCSx's internal MPI
-- **Automatic Mesh Mapping** — Nearest-neighbor interpolation via `scipy.spatial.KDTree` for non-conforming boundaries
+- **Clean API** — A single `CouplingInterface` class hides networking and mapping
+- **ZeroMQ IPC** — PyZMQ inter-process communication that doesn't interfere with FEniCSx's internal MPI
 - **FEniCSx Native** — Works directly with `dolfinx.fem.Function`, `dolfinx.mesh.Mesh`, and `MeshTags`
-- **Multiple Coupling Topologies** — `PAIR` (1-to-1), `PUSH/PULL` scatter-gather FE², and `REQ/REP` demand-driven FE² broker support
-- **Adapter-Based Integration** — Native adapter abstractions for FEniCSx, Kratos, and Abaqus workflows
+- **Mesh Mapping** — nearest-neighbor and consistent (inverse-distance) interpolation for non-conforming boundaries
+- **Implicit coupling** — Aitken dynamic relaxation and IQN-ILS quasi-Newton for strongly-coupled (added-mass) problems
+- **Multiple Coupling Topologies** — `PAIR` (1-to-1), `PUSH/PULL` scatter-gather FE², and `REQ/REP` demand-driven FE² broker
+- **Adapter-Based Integration** — adapter abstractions for FEniCSx, Kratos, and Abaqus workflows
+- **Validated benchmarks** — analytic correctness gates in [`benchmarks/`](benchmarks/), enforced in CI
 
 ## Installation
 
@@ -46,42 +79,58 @@ pip install -e .
 
 ## Quick Start
 
-### Thermal Solver (Terminal 1)
+### FE² homogenization — the flagship (one macro solver, a pool of RVE workers)
 
 ```python
-import dolfinx
-from mpi4py import MPI
 from fenicsx_cosim import CouplingInterface
 
-# Standard FEniCSx setup
-mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 20, 20)
-V = dolfinx.fem.functionspace(mesh, ("Lagrange", 1))
-temperature = dolfinx.fem.Function(V)
-
-# Initialize co-simulation
-cosim = CouplingInterface(name="ThermalSolver", partner_name="MechanicalSolver")
-cosim.register_interface(mesh, facet_tags, marker_id=1, function_space=V)
-
-# Time loop
-while t < T:
-    # ... solve thermal problem ...
-    cosim.export_data("TemperatureField", temperature)
-    cosim.import_data("DisplacementField", displacement)
-    cosim.advance_in_time()
+# Macro solver: scatter quadrature-point strains, gather homogenized stresses.
+macro = CouplingInterface(name="Macro", role="Master", topology="scatter-gather")
+macro.register_quadrature_space(V_quad)
+macro.scatter_gather_data("Strain", strain_fn, "Stress", stress_fn)
 ```
 
-### Mechanical Solver (Terminal 2)
+Start as many RVE workers as you want; each pulls a strain, solves its micro
+problem, and pushes back a stress. See `examples/fe2/`.
+
+### N > 2 coupling via the broker hub
 
 ```python
-from fenicsx_cosim import CouplingInterface
+from fenicsx_cosim import CouplingBroker, CouplingInterface
 
-cosim = CouplingInterface(name="MechanicalSolver", partner_name="ThermalSolver")
+# One hub process:
+CouplingBroker("tcp://*:5560", expected=3).start()
+
+# Each participant (Fluid / Thermal / Structure):
+ci = CouplingInterface(name="Fluid", topology="broker",
+                       endpoint="tcp://localhost:5560")
+ci.register_broker()                       # blocks until all 3 have joined
+ci.send_to("Thermal", "pressure", p_values)
+src, field, values = ci.receive_from()
+ci.barrier()
+```
+
+### Connector: FEniCSx ↔ another code (e.g. Kratos)
+
+> Two *FEniCSx* solvers that could be one program → solve monolithically.
+> Partitioning earns its keep only across **different codes**. Here the partner
+> is an external solver, and strong (implicit) coupling is wrapped with an
+> accelerator so added-mass problems converge.
+
+```python
+from fenicsx_cosim import CouplingInterface, IQNILS, fixed_point_iterate
+
+cosim = CouplingInterface(name="FEniCSxSolver", partner_name="ExternalSolver")
 cosim.register_interface(mesh, facet_tags, marker_id=1, function_space=V)
 
-while t < T:
-    cosim.import_data("TemperatureField", temperature)
-    # ... solve mechanical problem ...
-    cosim.export_data("DisplacementField", displacement)
+accel = IQNILS()                           # or Aitken() for cheap relaxation
+for _ in range(n_steps):
+    # one strong-coupling step: sub-iterate to a converged interface state
+    def coupled(x):                        # x = interface field (numpy)
+        cosim.export_data("Traction", x_to_function(x))
+        cosim.import_data("Displacement", disp)
+        return function_to_array(disp)
+    x_star, residuals = fixed_point_iterate(coupled, x0, accel)
     cosim.advance_in_time()
 ```
 

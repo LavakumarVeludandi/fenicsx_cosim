@@ -1,35 +1,40 @@
-# fenicsx-cosim vs preCICE FEniCSx adapter
+# fenicsx-cosim vs preCICE (honest, specific)
 
-This document provides a practical comparison to help users choose the right tool.
+[preCICE](https://precice.org/) is the mature, C++-core, well-funded standard
+for partitioned multiphysics. This document is deliberately specific so you can
+choose correctly — including the many cases where **preCICE is the right call**.
 
-## Installation complexity
+## Where preCICE is stronger (use preCICE)
 
-- **fenicsx-cosim**: pure-Python package workflow with FEniCSx dependencies.
-- **preCICE adapter**: typically involves preCICE runtime and adapter integration setup.
+| Capability | preCICE | fenicsx-cosim |
+|---|---|---|
+| Implicit coupling acceleration | IQN-ILS **and** IQN-IMVJ (multi-vector), waveform iteration | Aitken + IQN-ILS (no IMVJ, no waveform) |
+| Mapping | nearest-neighbor, nearest-projection, **RBF** (consistent & conservative) | nearest-neighbor, inverse-distance (consistent); **no RBF, no conservative FE projection yet** |
+| Solver ecosystem | official adapters: OpenFOAM, SU2, CalculiX, code_aster, Abaqus, FEniCS, … | FEniCSx-native; Kratos/Abaqus via thin adapters |
+| Multi-code, ≥3 participants | mature, configurable | `PAIR` is 1-to-1; ≥3 via broker is roadmap (P3) |
+| Maturity / validation | years of published validation, large community | young; analytic benchmarks only |
+| Runtime | optimized C++ with MPI ports | pure Python over ZeroMQ |
 
-## Coupling schemes
+If you need production FSI/CHT across multiple codes, RBF conservative mapping,
+or waveform/IMVJ acceleration: **use preCICE.** fenicsx-cosim does not try to win
+that fight.
 
-- **fenicsx-cosim**: currently centered on partitioned explicit workflows, with strong-coupling extensions on the roadmap.
-- **preCICE adapter**: mature support for several coupling configurations and schemes.
+## Where fenicsx-cosim is stronger (use fenicsx-cosim)
 
-## Mapping methods
+| Capability | fenicsx-cosim | preCICE |
+|---|---|---|
+| Setup for a FEniCSx user | `pip install`, pure Python, operate on `dolfinx` objects directly | C++ runtime + per-solver adapter + XML config |
+| FE² / RVE worker-pool dispatch | first-class (`PUSH/PULL`, `REQ/REP` broker, quadrature extraction) | not a target — couples a fixed participant set over a shared interface mesh |
+| FEniCSx ↔ Kratos mesh + material translation | writes/reads loadable `.mdpa` + materials.json (element family, Properties, SubModelParts) | out of scope (runtime field exchange, not mesh/material formats) |
+| Hackability | one small Python package; subclass a mapper or accelerator in minutes | larger C++ codebase |
 
-- **fenicsx-cosim**: nearest-neighbor mapping is available; higher-order methods are planned.
-- **preCICE adapter**: broader established mapping options in existing preCICE workflows.
+## Decision rule
 
-## Performance profile
+- **FEniCSx-native homogenization (FE²), RVE pools** → fenicsx-cosim.
+- **Moving a mesh + constitutive model between FEniCSx and Kratos** → fenicsx-cosim.
+- **A quick FEniCSx ↔ one-other-code coupling with minimal setup** → fenicsx-cosim.
+- **Multi-code production FSI/CHT, conservative RBF, IMVJ/waveform** → preCICE.
 
-- **fenicsx-cosim**: favors lightweight Python-level integration and rapid experimentation.
-- **preCICE adapter**: optimized coupling infrastructure designed for larger multi-code deployments.
-
-## When to choose each
-
-Choose **fenicsx-cosim** when you want:
-- fast prototyping in pure Python,
-- direct integration with FEniCSx-native data structures,
-- compact custom workflows (including FE²-style orchestration).
-
-Choose **preCICE adapter** when you need:
-- production-grade coupling features already available in preCICE,
-- broad interoperability with multiple external solvers,
-- mature coupling-ecosystem tooling out of the box.
+Honest summary: for a team that lives in FEniCSx, fenicsx-cosim is the
+lower-friction default and the only option for FE² farming and Kratos
+mesh/material bridging. For everything preCICE was built for, preCICE wins.

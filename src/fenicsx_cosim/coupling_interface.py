@@ -45,6 +45,7 @@ from typing import Literal, Optional
 import numpy as np
 
 from fenicsx_cosim.adapters.base import SolverAdapter
+from fenicsx_cosim.broker_communicator import BrokerClient
 from fenicsx_cosim.communicator import Communicator
 from fenicsx_cosim.data_mapper import DataMapper, NearestNeighborMapper
 from fenicsx_cosim.dynamic_mapper import DynamicMapper
@@ -117,6 +118,7 @@ class CouplingInterface:
         topology: str = "pair",
         push_endpoint: str = "tcp://*:5556",
         pull_endpoint: str = "tcp://*:5557",
+        n_participants: Optional[int] = None,
     ) -> None:
         self.name = name
         self.partner_name = partner_name
@@ -136,9 +138,27 @@ class CouplingInterface:
         self._quad_registered = False
         self._step_count = 0
         self._disconnected = False
+        self._broker_client: Optional[BrokerClient] = None
+        self._broker_registered = False
 
         # --- Topology-specific setup ------------------------------------
-        if topology == "scatter-gather":
+        if topology == "broker":
+            # N>2 routed coupling: this interface is one client of a separately
+            # running CouplingBroker hub. Raw named-array exchange + barrier;
+            # field-level (Function) N-way mapping is future scope.
+            self._sg_communicator = None
+            self._communicator = None
+            self.role = "client"
+            self.endpoint = endpoint or "tcp://localhost:5560"
+            self._n_participants = n_participants
+            self._broker_client = BrokerClient(
+                name=name, endpoint=self.endpoint, timeout_ms=timeout_ms,
+            )
+            logger.info(
+                "[%s] CouplingInterface ready (broker, hub=%s)",
+                name, self.endpoint,
+            )
+        elif topology == "scatter-gather":
             # FE² scatter-gather mode
             sg_role = "master" if role in ("Master", "bind", None) else "worker"
             self._sg_communicator = ScatterGatherCommunicator(
@@ -748,6 +768,46 @@ class CouplingInterface:
         return self.gather_data(gather_name, gather_function, n)
 
     # ==================================================================
+    # N>2 broker coupling (ROUTER/DEALER hub)
+    # ==================================================================
+
+    def register_broker(self, join_timeout_ms: int = 60_000) -> None:
+        """Join the broker hub; blocks until all participants have registered.
+
+        Requires ``topology='broker'`` and a separately running
+        :class:`~fenicsx_cosim.broker_communicator.CouplingBroker`.
+        """
+        self._check_broker("register_broker")
+        self._broker_client.register(join_timeout_ms=join_timeout_ms)
+        self._broker_registered = True
+
+    def send_to(self, dest: str, data_name: str, array: np.ndarray) -> None:
+        """Send a named array to participant ``dest`` via the broker hub."""
+        self._check_broker("send_to", need_registered=True)
+        self._broker_client.send(dest, data_name, array)
+
+    def receive_from(self) -> tuple[str, str, np.ndarray]:
+        """Receive one routed message: ``(src_name, data_name, array)``."""
+        self._check_broker("receive_from", need_registered=True)
+        return self._broker_client.receive()
+
+    def barrier(self) -> None:
+        """Block until every registered participant reaches the barrier."""
+        self._check_broker("barrier", need_registered=True)
+        self._broker_client.barrier()
+
+    def _check_broker(self, method: str, need_registered: bool = False) -> None:
+        if self._broker_client is None:
+            raise RuntimeError(
+                f"[{self.name}] {method}() requires topology='broker'. "
+                "Initialize with CouplingInterface(..., topology='broker')."
+            )
+        if need_registered and not self._broker_registered:
+            raise RuntimeError(
+                f"[{self.name}] call register_broker() before {method}()."
+            )
+
+    # ==================================================================
     # Standard data exchange (boundary coupling)
     # ==================================================================
 
@@ -931,6 +991,8 @@ class CouplingInterface:
             self._communicator.close()
         if self._sg_communicator is not None:
             self._sg_communicator.close()
+        if self._broker_client is not None:
+            self._broker_client.close()
         logger.info("[%s] Disconnected", self.name)
         self._disconnected = True
 
